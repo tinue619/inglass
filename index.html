@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/drag-drop.css">
+</head>
+<body>
+    <div id="app"></div>
+    
+    <!-- Подключаем модули в правильном порядке -->
+    <script>
+        console.log('🔧 Начало загрузки модулей...');
+    </script>
+    
+    <!-- Константы и утилиты -->
+    <script src="js/utils/constants.js"></script>
+    <script src="js/utils/phoneUtils.js"></script>
+    <script src="js/utils/contactEntities.js"></script>
+    <script src="js/utils/orderUtils.js"></script>
+    
+    <!-- Модули данных и логики -->
+    <script src="js/modules/dataManager.js"></script>
+    <script src="js/modules/modalModule.js"></script>
+    <script src="js/modules/authModule.js"></script>
+    <script src="js/modules/boardModule.js"></script>
+    <script src="js/modules/defectModule.js"></script>
+    <script src="js/modules/adminModule.js"></script>
+    <script src="js/modules/appModule.js"></script>
+    
+    <!-- Инициализация приложения -->
+    <script>
+        console.log('✅ Все модули загружены!');
+        
+        // Инициализация приложения
+        document.addEventListener('DOMContentLoaded', () => {
+            AppModule.init();
+            AppModule.initWindowEvents();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Test</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div id="app">
+        <div style="padding: 20px;">
+            <h1>Простой тест CRM</h1>
+            <button onclick="testSystem()" class="btn btn-primary">Тест системы</button>
+            <button onclick="forceCreateData()" class="btn btn-success">Принудительное создание данных</button>
+            <div id="output" style="margin-top: 20px; background: #f5f5f5; padding: 15px; border-radius: 5px;"></div>
+        </div>
+    </div>
+    
+    <script src="js/data.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/board.js"></script>
+    <script src="js/app.js"></script>
+    
+    <script>
+        function output(message) {
+            const outputDiv = document.getElementById('output');
+            outputDiv.innerHTML += message + '<br>';
+            console.log(message);
+        }
+        
+        function testSystem() {
+            document.getElementById('output').innerHTML = '';
+            output('=== ТЕСТ СИСТЕМЫ ===');
+            
+            try {
+                // Загружаем данные
+                loadData();
+                output('✅ Данные загружены');
+                output(`Пользователей: ${data.users.length}`);
+                output(`Процессов: ${data.processes.length}`);
+                output(`Изделий: ${data.products.length}`);
+                output(`Заказов: ${data.orders.length}`);
+                
+                // Проверяем структуру данных
+                if (data.users.length > 0) {
+                    output(`Первый пользователь: ${JSON.stringify(data.users[0])}`);
+                }
+                
+                // Пытаемся создать админ панель
+                data.currentUser = data.users.find(u => u.isAdmin);
+                if (data.currentUser) {
+                    output(`✅ Админ найден: ${data.currentUser.name}`);
+                    
+                    // Создаем контейнер для теста
+                    document.getElementById('app').innerHTML += `
+                        <div id="mainContent" style="margin-top: 20px;">
+                            <div style="padding: 20px; background: white; border-radius: 5px;">
+                                Здесь будет админ панель...
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Тестируем админ панель
+                    setTimeout(() => {
+                        try {
+                            showAdminPanel();
+                            output('✅ Админ панель создана');
+                        } catch (error) {
+                            output(`❌ Ошибка создания админ панели: ${error.message}`);
+                        }
+                    }, 100);
+                    
+                } else {
+                    output('❌ Админ не найден');
+                }
+                
+            } catch (error) {
+                output(`❌ Ошибка теста: ${error.message}`);
+            }
+        }
+        
+        function forceCreateData() {
+            output('=== ПРИНУДИТЕЛЬНОЕ СОЗДАНИЕ ДАННЫХ ===');
+            
+            // Создаем минимальный набор данных вручную
+            data.users = [
+                {
+                    id: 1,
+                    name: "Администратор",
+                    phone: "+7 777 777 7777",
+                    password: "1488",
+                    isAdmin: true,
+                    processes: [],
+                    canCreateOrders: true
+                }
+            ];
+            
+            data.processes = [
+                { id: 1, name: 'Прием заказа', order: 1 },
+                { id: 2, name: 'Резка', order: 2 },
+                { id: 3, name: 'Упаковка', order: 3 }
+            ];
+            
+            data.products = [
+                { 
+                    id: 1, 
+                    name: 'Стекло', 
+                    processes: [1, 2, 3]
+                }
+            ];
+            
+            data.orders = [
+                {
+                    id: 1,
+                    number: 'TEST-001',
+                    productId: 1,
+                    customerName: 'Тестовый клиент',
+                    customerPhone: '+7 999 999 9999',
+                    currentProcessId: 1,
+                    customFields: {},
+                    createdAt: new Date().toISOString()
+                }
+            ];
+            
+            // Сохраняем
+            saveData();
+            output('✅ Данные созданы принудительно');
+            
+            // Тестируем
+            setTimeout(() => {
+                testSystem();
+            }, 200);
+        }
+        
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testSystem();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

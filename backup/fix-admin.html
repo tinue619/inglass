@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Восстановление Админа</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div id="app" style="padding: 40px; max-width: 600px; margin: 0 auto;">
+        <h1>🔧 Восстановление Системы</h1>
+        
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3>Текущее состояние:</h3>
+            <div id="status">Проверка...</div>
+        </div>
+        
+        <div style="display: flex; flex-direction: column; gap: 15px;">
+            <button onclick="checkStatus()" class="btn btn-primary">🔍 Проверить статус</button>
+            <button onclick="fixAdmin()" class="btn btn-success">👑 Восстановить админа</button>
+            <button onclick="resetToDefaults()" class="btn btn-warning">🗑️ Полный сброс</button>
+            <button onclick="testLogin()" class="btn btn-secondary">🚪 Тест входа</button>
+        </div>
+        
+        <div id="result" style="margin-top: 30px; padding: 20px; border-radius: 8px;"></div>
+    </div>
+    
+    <script src="js/data.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/board.js"></script>
+    <script src="js/app.js"></script>
+    
+    <script>
+        function showResult(message, isError = false) {
+            const result = document.getElementById('result');
+            result.innerHTML = message;
+            result.style.background = isError ? '#ffe6e6' : '#e6ffe6';
+            result.style.color = isError ? '#d63384' : '#198754';
+            result.style.border = `1px solid ${isError ? '#d63384' : '#198754'}`;
+        }
+        
+        function checkStatus() {
+            try {
+                loadData();
+                
+                const admin = data.users.find(u => u.isAdmin);
+                const currentUser = loadCurrentUser() ? data.currentUser : null;
+                
+                let status = '<h4>Статус системы:</h4>';
+                status += `<p><strong>Всего пользователей:</strong> ${data.users.length}</p>`;
+                status += `<p><strong>Админ найден:</strong> ${admin ? '✅ Да' : '❌ Нет'}</p>`;
+                
+                if (admin) {
+                    status += `<p><strong>Имя админа:</strong> ${admin.name}</p>`;
+                    status += `<p><strong>Телефон:</strong> ${admin.phone}</p>`;
+                    status += `<p><strong>Права админа:</strong> ${admin.isAdmin ? '✅ Есть' : '❌ Нет'}</p>`;
+                }
+                
+                status += `<p><strong>Текущая сессия:</strong> ${currentUser ? currentUser.name + (currentUser.isAdmin ? ' (Админ)' : ' (Пользователь)') : 'Нет'}</p>`;
+                status += `<p><strong>Процессов:</strong> ${data.processes.length}</p>`;
+                status += `<p><strong>Изделий:</strong> ${data.products.length}</p>`;
+                status += `<p><strong>Заказов:</strong> ${data.orders.length}</p>`;
+                
+                document.getElementById('status').innerHTML = status;
+                
+                if (!admin) {
+                    showResult('❌ Админ не найден! Нужно восстановление.', true);
+                } else if (!admin.isAdmin) {
+                    showResult('❌ У админа нет прав! Нужно исправление.', true);
+                } else {
+                    showResult('✅ Админ в порядке!');
+                }
+                
+            } catch (error) {
+                showResult('❌ Ошибка проверки: ' + error.message, true);
+            }
+        }
+        
+        function fixAdmin() {
+            try {
+                loadData();
+                
+                // Ищем админа
+                let admin = data.users.find(u => u.isAdmin);
+                
+                if (!admin) {
+                    // Создаем нового админа
+                    admin = {
+                        id: 1,
+                        name: "Администратор",
+                        phone: "+7 777 777 7777",
+                        password: "1488",
+                        isAdmin: true,
+                        processes: [],
+                        canCreateOrders: true
+                    };
+                    
+                    data.users.unshift(admin);
+                    showResult('✅ Новый админ создан!');
+                } else {
+                    // Исправляем права существующего
+                    admin.isAdmin = true;
+                    admin.canCreateOrders = true;
+                    admin.processes = [];
+                    showResult('✅ Права админа восстановлены!');
+                }
+                
+                saveData();
+                sessionStorage.removeItem('currentUser'); // Очищаем сессию
+                
+                checkStatus(); // Обновляем статус
+                
+            } catch (error) {
+                showResult('❌ Ошибка восстановления: ' + error.message, true);
+            }
+        }
+        
+        function testLogin() {
+            try {
+                loadData();
+                
+                // Очищаем текущую сессию
+                data.currentUser = null;
+                sessionStorage.removeItem('currentUser');
+                
+                // Показываем экран входа
+                showLoginScreen();
+                showResult('✅ Экран входа загружен. Попробуйте войти как Администратор с паролем 1488');
+                
+            } catch (error) {
+                showResult('❌ Ошибка теста входа: ' + error.message, true);
+            }
+        }
+        
+        // Автоматическая проверка при загрузке
+        window.addEventListener('load', () => {
+            setTimeout(checkStatus, 500);
+        });
+    </script>
+</body>
+</html>

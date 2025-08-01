@@ -1,0 +1,21 @@
+
+/* Drag & Drop стили */
+.order-card[draggable="true"] {
+    cursor: grab;
+}
+
+.order-card[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.process-column.drag-over {
+    background-color: var(--success-light);
+    border: 2px dashed var(--success);
+    border-radius: var(--radius-md);
+    transition: all 0.2s ease;
+}
+
+.process-column.drag-over .process-header {
+    background-color: var(--success-light);
+    border-radius: var(--radius-sm);
+}

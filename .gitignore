@@ -1,0 +1,23 @@
+# Файлы для игнорирования в Git
+node_modules/
+*.log
+.env
+.DS_Store
+Thumbs.db
+
+# Локальная база данных (на хостинге создастся автоматически)
+server/database/inglass.db
+server/database/backup-*.json
+
+# IDE файлы
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Временные файлы
+*.tmp
+*.temp
+
+# Папка подготовки для деплоя
+hosting-deploy/

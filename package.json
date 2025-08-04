@@ -1,0 +1,28 @@
+{
+  "name": "inglass-crm",
+  "version": "1.0.0",
+  "description": "Inglass CRM - система управления заказами",
+  "main": "server/server-hosting.js",
+  "scripts": {
+    "start": "cd server && node server-hosting.js",
+    "build": "echo 'No build step required'",
+    "install-server": "cd server && npm install"
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/inglass.git"
+  },
+  "keywords": [
+    "crm",
+    "orders",
+    "management",
+    "glass",
+    "sqlite"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

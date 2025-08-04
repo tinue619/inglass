@@ -1,16 +1,32 @@
 // Сервис для работы с API сервера
 class APIService {
     constructor() {
-        this.baseUrl = 'http://localhost:3001/api';
+        // Автоматическое определение базового URL
+        this.baseUrl = this.getBaseUrl();
         this.isOnline = false;
         this.syncInProgress = false;
         this.lastSyncTime = null;
+        
+        console.log('🌐 API Service инициализирован, базовый URL:', this.baseUrl);
         
         // Проверяем доступность сервера при инициализации
         this.checkServerStatus();
         
         // Периодически проверяем статус сервера
         setInterval(() => this.checkServerStatus(), 30000); // каждые 30 секунд
+    }
+    
+    // Автоматическое определение базового URL
+    getBaseUrl() {
+        const currentDomain = window.location.origin;
+        
+        // Если мы на localhost, используем стандартный порт
+        if (currentDomain.includes('localhost') || currentDomain.includes('127.0.0.1')) {
+            return 'http://localhost:3001/api';
+        }
+        
+        // Если на хостинге, используем тот же домен
+        return `${currentDomain}/api`;
     }
     
     // Проверка доступности сервера

@@ -1,0 +1,25 @@
+{
+  "name": "inglass-crm-hosting",
+  "version": "1.0.0",
+  "description": "Inglass CRM Server для хостинга с SQLite",
+  "main": "server-hosting.js",
+  "scripts": {
+    "start": "node server-hosting.js",
+    "build": "echo 'No build step required'",
+    "init-db": "node database/init-database.js",
+    "postinstall": "npm run init-db"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2",
+    "sqlite3": "^5.1.6",
+    "bcrypt": "^5.1.0"
+  },
+  "keywords": ["crm", "inglass", "sqlite", "hosting"],
+  "author": "",
+  "license": "MIT"
+}

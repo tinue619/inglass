@@ -21,6 +21,11 @@ const AppModule = {
                             <img src="assets/name.svg" alt="Company Name" onerror="this.src='assets/name-placeholder.svg'" style="height: 24px;">
                         </div>
                         <div class="header-actions">
+                            <div class="sync-status" id="syncStatus">
+                                <button class="btn btn-secondary btn-small" onclick="APIService.forceSync()" title="Ручная синхронизация">
+                                    🔄 Синхронизация
+                                </button>
+                            </div>
                             <div class="user-info">
                                 <span>👤 ${currentUser.name}</span>
                             </div>
@@ -74,12 +79,12 @@ const AppModule = {
     },
 
     // Инициализация приложения
-    init() {
+    async init() {
         console.log('App started');
         
         try {
-            // Загружаем данные
-            DataManager.load();
+            // Загружаем данные (асинхронно)
+            await DataManager.load();
             
             // Пытаемся загрузить текущего пользователя
             if (DataManager.loadCurrentUser()) {

@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тестовые данные - Inglass CRM</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .btn.success {
+            background: #28a745;
+        }
+        .btn.success:hover {
+            background: #1e7e34;
+        }
+        .btn.danger {
+            background: #dc3545;
+        }
+        .btn.danger:hover {
+            background: #c82333;
+        }
+        .actions {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .info-box {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        li {
+            margin: 5px 0;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Создание тестовых данных</h1>
+        
+        <div id="status"></div>
+        
+        <div class="info-box">
+            <h3>Что будет создано:</h3>
+            <ul>
+                <li><strong>Пользователи (3):</strong>
+                    <ul>
+                        <li>Администратор (тел: +7 777 777 7777, пароль: 1488)</li>
+                        <li>Менеджер Анна (тел: +7 111 111 1111, пароль: 1111)</li>
+                        <li>Мастер Иван (тел: +7 222 222 2222, пароль: 2222)</li>
+                    </ul>
+                </li>
+                <li><strong>Процессы (5):</strong> Прием заказа, Замер, Резка стекла, Обработка кромки, Упаковка</li>
+                <li><strong>Изделия (3):</strong> Стекло прозрачное, Зеркало, Стеклопакет</li>
+                <li><strong>Заказы (3):</strong> Тестовые заказы с историей событий</li>
+            </ul>
+        </div>
+        
+        <div class="actions">
+            <button id="checkBtn" class="btn" onclick="checkServerStatus()">
+                🔍 Проверить сервер
+            </button>
+            
+            <button id="createBtn" class="btn success" onclick="createTestData()" disabled>
+                ✨ Создать тестовые данные
+            </button>
+            
+            <button id="clearBtn" class="btn danger" onclick="clearData()">
+                🗑️ Очистить все данные
+            </button>
+        </div>
+        
+        <div class="info-box">
+            <h3>📋 Инструкции:</h3>
+            <ol>
+                <li>Убедитесь что сервер запущен (start-server.bat)</li>
+                <li>Нажмите "Проверить сервер" для проверки соединения</li>
+                <li>Нажмите "Создать тестовые данные" для наполнения системы</li>
+                <li>Откройте главное приложение (index.html) и войдите под одним из пользователей</li>
+            </ol>
+        </div>
+    </div>
+
+    <script src="create-test-data.js"></script>
+    <script>
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function setLoading(buttonId, loading = true) {
+            const btn = document.getElementById(buttonId);
+            if (loading) {
+                btn.innerHTML = '<span class="loading"></span>' + btn.textContent;
+                btn.disabled = true;
+            } else {
+                btn.innerHTML = btn.textContent.replace('⟳ ', '');
+                btn.disabled = false;
+            }
+        }
+
+        async function checkServerStatus() {
+            setLoading('checkBtn', true);
+            showStatus('🔄 Проверяем соединение с сервером...', 'info');
+            
+            try {
+                const isOnline = await checkServer();
+                if (isOnline) {
+                    showStatus('✅ Сервер доступен! Можно создавать тестовые данные.', 'success');
+                    document.getElementById('createBtn').disabled = false;
+                } else {
+                    showStatus('❌ Сервер недоступен. Запустите сервер командой start-server.bat', 'error');
+                    document.getElementById('createBtn').disabled = true;
+                }
+            } catch (error) {
+                showStatus(`❌ Ошибка подключения: ${error.message}`, 'error');
+                document.getElementById('createBtn').disabled = true;
+            } finally {
+                setLoading('checkBtn', false);
+            }
+        }
+
+        async function createTestData() {
+            setLoading('createBtn', true);
+            showStatus('🔄 Создаем тестовые данные...', 'info');
+            
+            try {
+                const response = await fetch('http://localhost:3001/api/data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                if (response.ok) {
+                    showStatus(`
+                        ✅ Тестовые данные успешно созданы!<br>
+                        👥 Пользователей: ${testData.users.length}<br>
+                        ⚙️ Процессов: ${testData.processes.length}<br>
+                        📦 Изделий: ${testData.products.length}<br>
+                        📋 Заказов: ${testData.orders.length}<br><br>
+                        <strong>Теперь можете открыть главное приложение и войти под любым пользователем!</strong>
+                    `, 'success');
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                showStatus(`❌ Ошибка создания данных: ${error.message}`, 'error');
+            } finally {
+                setLoading('createBtn', false);
+            }
+        }
+
+        async function clearData() {
+            if (!confirm('⚠️ Вы уверены что хотите удалить ВСЕ данные?\n\nЭто действие нельзя отменить!')) {
+                return;
+            }
+            
+            setLoading('clearBtn', true);
+            showStatus('🔄 Очищаем все данные...', 'info');
+            
+            try {
+                const emptyData = {
+                    users: [{
+                        id: 1,
+                        name: "Администратор",
+                        phone: "+7 777 777 7777",
+                        password: "1488",
+                        isAdmin: true,
+                        processes: [],
+                        canCreateOrders: true
+                    }],
+                    processes: [],
+                    products: [],
+                    orders: [],
+                    lastSync: new Date().toISOString()
+                };
+                
+                const response = await fetch('http://localhost:3001/api/data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(emptyData)
+                });
+                
+                if (response.ok) {
+                    showStatus('✅ Все данные очищены! Остался только администратор.', 'success');
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                showStatus(`❌ Ошибка очистки данных: ${error.message}`, 'error');
+            } finally {
+                setLoading('clearBtn', false);
+            }
+        }
+
+        // Автоматическая проверка сервера при загрузке
+        window.addEventListener('load', () => {
+            setTimeout(checkServerStatus, 500);
+        });
+    </script>
+</body>
+</html>

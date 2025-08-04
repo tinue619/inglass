@@ -108,7 +108,7 @@ const DataManager = {
         return true;
     },
 
-    // Сохранение данных в localStorage
+    // Сохранение данных в localStorage и на сервер
     save() {
         try {
             const dataToSave = {
@@ -117,16 +117,26 @@ const DataManager = {
                 products: this._data.products,
                 orders: this._data.orders
             };
+            
+            // Сохраняем локально
             localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.CRM_DATA, JSON.stringify(dataToSave));
-            console.log('Данные сохранены');
+            console.log('Данные сохранены локально');
+            
+            // Отправляем на сервер если доступен
+            if (window.APIService && window.APIService.isOnline) {
+                window.APIService.saveToServer().catch(error => {
+                    console.warn('Не удалось сохранить на сервер:', error);
+                });
+            }
         } catch (error) {
             console.error('Ошибка сохранения данных:', error);
         }
     },
 
-    // Загрузка данных из localStorage
-    load() {
+    // Загрузка данных из localStorage и попытка синхронизации с сервером
+    async load() {
         try {
+            // Сначала загружаем локальные данные
             const savedData = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.CRM_DATA);
             if (savedData) {
                 const parsed = JSON.parse(savedData);
@@ -135,19 +145,31 @@ const DataManager = {
                 this._data.products = parsed.products || [];
                 this._data.orders = parsed.orders || [];
                 
-                // Проверяем и восстанавливаем админа если его нет
-                const admin = this._data.users.find(u => u.isAdmin);
-                if (!admin) {
-                    console.log('Админ не найден, создаем заново');
-                    this._data.users.unshift(APP_CONSTANTS.DEFAULTS.ADMIN_USER);
-                    this.save();
-                }
-                
                 console.log('Данные загружены из localStorage');
             } else {
                 console.log('Используются данные по умолчанию');
-                this.save();
             }
+            
+            // Проверяем и восстанавливаем админа если его нет
+            const admin = this._data.users.find(u => u.isAdmin);
+            if (!admin) {
+                console.log('Админ не найден, создаем заново');
+                this._data.users.unshift(APP_CONSTANTS.DEFAULTS.ADMIN_USER);
+            }
+            
+            // Сохраняем локально
+            this.save();
+            
+            // Пытаемся синхронизироваться с сервером
+            if (window.APIService) {
+                // Ждем небольшой таймаут для инициализации API сервиса
+                setTimeout(() => {
+                    if (window.APIService.isOnline) {
+                        window.APIService.autoSync();
+                    }
+                }, 1000);
+            }
+            
         } catch (error) {
             console.error('Ошибка загрузки данных:', error);
             console.log('Используются данные по умолчанию');

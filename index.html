@@ -24,6 +24,9 @@
     <script src="js/utils/contactEntities.js"></script>
     <script src="js/utils/orderUtils.js"></script>
     
+    <!-- Сервисы -->
+    <script src="js/services/APIService.js"></script>
+    
     <!-- Модули данных и логики -->
     <script src="js/modules/dataManager.js"></script>
     <script src="js/modules/modalModule.js"></script>
@@ -38,8 +41,8 @@
         console.log('✅ Все модули загружены!');
         
         // Инициализация приложения
-        document.addEventListener('DOMContentLoaded', () => {
-            AppModule.init();
+        document.addEventListener('DOMContentLoaded', async () => {
+            await AppModule.init();
             AppModule.initWindowEvents();
         });
     </script>

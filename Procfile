@@ -1,1 +1,1 @@
-web: cd server && npm install && node server-hosting.js
+web: node server-hosting.js

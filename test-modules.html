@@ -21,6 +21,7 @@
     
     <button class="btn btn-primary" onclick="testModules()">🔍 Проверить модули</button>
     <button class="btn btn-primary" onclick="testBoardModule()">📋 Тест BoardModule</button>
+    <button class="btn btn-primary" onclick="forceReloadBoardModule()">🔄 Перезагрузить BoardModule</button>
     
     <!-- Подключаем модули в том же порядке что и в index.html -->
     <script src="js/utils/constants.js"></script>
@@ -84,15 +85,42 @@
             addResult('🏁 Проверка завершена', 'info');
         }
         
-        async function testBoardModule() {
+        function testBoardModule() {
             addResult('📋 Тестирование BoardModule...', 'info');
             
+            // Проверяем что BoardModule существует
             if (!window.BoardModule) {
-                addResult('❌ BoardModule не найден!', 'error');
+                addResult('❌ BoardModule не найден в window!', 'error');
+                
+                // Проверяем возможные причины
+                addResult('🔍 Проверяем возможные причины...', 'info');
+                
+                // Проверяем что файл загружен
+                const scripts = document.querySelectorAll('script[src*="boardModule"]');
+                if (scripts.length > 0) {
+                    addResult(`✅ Скрипт boardModule.js найден в DOM (${scripts.length})`, 'success');
+                } else {
+                    addResult('❌ Скрипт boardModule.js НЕ найден в DOM!', 'error');
+                }
+                
+                // Проверяем окно на наличие схожих объектов
+                const possibleNames = ['BoardModule', 'boardModule', 'Board', 'board'];
+                possibleNames.forEach(name => {
+                    if (window[name]) {
+                        addResult(`ℹ️ Найден объект window.${name}`, 'info');
+                    }
+                });
+                
                 return;
             }
             
             try {
+                // Тестируем базовую функцию
+                if (typeof BoardModule.test === 'function') {
+                    const testResult = BoardModule.test();
+                    addResult(`✅ BoardModule.test() вернул: ${testResult}`, 'success');
+                }
+                
                 // Инициализируем DataManager
                 await DataManager.load();
                 addResult('✅ DataManager инициализирован', 'success');
@@ -108,20 +136,26 @@
                 }
                 
                 // Создаем тестовый контейнер
-                const testContainer = document.createElement('div');
-                testContainer.id = 'mainContent';
-                testContainer.style.cssText = 'width: 100%; height: 300px; border: 1px solid #ccc; margin: 10px 0; display: none;';
-                document.body.appendChild(testContainer);
+                let testContainer = document.getElementById('mainContent');
+                if (!testContainer) {
+                    testContainer = document.createElement('div');
+                    testContainer.id = 'mainContent';
+                    testContainer.style.cssText = 'width: 100%; min-height: 300px; border: 2px solid #007bff; margin: 10px 0; padding: 20px; border-radius: 8px;';
+                    document.body.appendChild(testContainer);
+                    addResult('✅ Тестовый контейнер mainContent создан', 'success');
+                }
                 
                 // Тестируем showProcessBoard
+                addResult('📋 Запускаем BoardModule.showProcessBoard()...', 'info');
                 BoardModule.showProcessBoard();
                 addResult('✅ BoardModule.showProcessBoard() выполнен без ошибок', 'success');
                 
                 // Проверяем что контент создался
-                if (testContainer.innerHTML.trim()) {
-                    addResult('✅ Контент доски создан', 'success');
+                if (testContainer.children.length > 0) {
+                    addResult(`✅ Контент доски создан (${testContainer.children.length} элементов)`, 'success');
+                    testContainer.style.display = 'block';
                 } else {
-                    addResult('⚠️ Контент доски пуст (возможно нет данных)', 'info');
+                    addResult('⚠️ Контент доски пуст', 'info');
                 }
                 
             } catch (error) {
@@ -137,6 +171,52 @@
                 testModules();
             }, 100);
         });
+        
+        // Функция для принудительной перезагрузки BoardModule
+        function forceReloadBoardModule() {
+            addResult('🔄 Принудительная перезагрузка BoardModule...', 'info');
+            
+            try {
+                // Удаляем старый скрипт
+                const oldScript = document.querySelector('script[src*="boardModule"]');
+                if (oldScript) {
+                    oldScript.remove();
+                    addResult('✅ Старый скрипт boardModule удален', 'success');
+                }
+                
+                // Очищаем window.BoardModule
+                if (window.BoardModule) {
+                    delete window.BoardModule;
+                    addResult('✅ window.BoardModule очищен', 'success');
+                }
+                
+                // Создаем новый скрипт с уникальным временем
+                const newScript = document.createElement('script');
+                newScript.src = `js/modules/boardModule.js?v=${Date.now()}`;
+                newScript.onload = () => {
+                    addResult('✅ BoardModule перезагружен успешно', 'success');
+                    
+                    // Проверяем что модуль загрузился
+                    if (window.BoardModule) {
+                        addResult('✅ window.BoardModule теперь доступен', 'success');
+                        if (typeof window.BoardModule.showProcessBoard === 'function') {
+                            addResult('✅ BoardModule.showProcessBoard() доступна', 'success');
+                        }
+                    } else {
+                        addResult('❌ window.BoardModule все еще недоступен', 'error');
+                    }
+                };
+                newScript.onerror = () => {
+                    addResult('❌ Ошибка перезагрузки BoardModule', 'error');
+                };
+                
+                document.head.appendChild(newScript);
+                addResult('ℹ️ Новый скрипт добавлен, ожидаем загрузку...', 'info');
+                
+            } catch (error) {
+                addResult(`❌ Ошибка перезагрузки: ${error.message}`, 'error');
+            }
+        }
     </script>
 </body>
 </html>

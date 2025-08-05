@@ -1,62 +1,43 @@
-// Сервис для работы с API сервера
+// Упрощенный сервис для работы с API сервера
 class APIService {
     constructor() {
-        // Автоматическое определение базового URL
         this.baseUrl = this.getBaseUrl();
         this.isOnline = false;
-        this.syncInProgress = false;
-        this.lastSyncTime = null;
-        
         console.log('🌐 API Service инициализирован, базовый URL:', this.baseUrl);
         
-        // Проверяем доступность сервера при инициализации
+        // Проверяем доступность сервера
         this.checkServerStatus();
-        
-        // Периодически проверяем статус сервера
-        setInterval(() => this.checkServerStatus(), 30000); // каждые 30 секунд
+        setInterval(() => this.checkServerStatus(), 30000);
     }
     
-    // Автоматическое определение базового URL
     getBaseUrl() {
         const currentDomain = window.location.origin;
-        
-        // Если мы на localhost, используем стандартный порт
         if (currentDomain.includes('localhost') || currentDomain.includes('127.0.0.1')) {
             return 'http://localhost:3001/api';
         }
-        
-        // Если на хостинге, используем тот же домен
         return `${currentDomain}/api`;
     }
     
-    // Проверка доступности сервера
     async checkServerStatus() {
         try {
             const response = await fetch(`${this.baseUrl}/health`, {
                 method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 timeout: 5000
             });
             
             if (response.ok) {
                 const result = await response.json();
-                if (result.success) {
-                    if (!this.isOnline) {
-                        console.log('🟢 Сервер доступен, подключение установлено');
-                        this.isOnline = true;
-                        this.showConnectionStatus(true);
-                        
-                        // Автоматическая синхронизация при восстановлении соединения
-                        this.autoSync();
-                    }
-                    return true;
+                if (result.success && !this.isOnline) {
+                    console.log('🟢 Сервер доступен');
+                    this.isOnline = true;
+                    this.showConnectionStatus(true);
                 }
+                return true;
             }
         } catch (error) {
             if (this.isOnline) {
-                console.log('🔴 Сервер недоступен, работаем в автономном режиме');
+                console.log('🔴 Сервер недоступен, работаем локально');
                 this.isOnline = false;
                 this.showConnectionStatus(false);
             }
@@ -64,22 +45,22 @@ class APIService {
         return false;
     }
     
-    // Показать статус соединения в UI
     showConnectionStatus(online) {
-        // Удаляем предыдущий индикатор если есть
         const existingIndicator = document.querySelector('.connection-status');
-        if (existingIndicator) {
-            existingIndicator.remove();
-        }
+        if (existingIndicator) existingIndicator.remove();
         
-        // Создаем новый индикатор
         const indicator = document.createElement('div');
         indicator.className = `connection-status ${online ? 'online' : 'offline'}`;
         indicator.textContent = online ? '🟢 Онлайн' : '🟡 Автономно';
-        
+        indicator.style.cssText = `
+            position: fixed; top: 20px; right: 20px; z-index: 1000;
+            padding: 8px 12px; border-radius: 4px; font-size: 12px;
+            background: ${online ? '#d4edda' : '#fff3cd'};
+            border: 1px solid ${online ? '#c3e6cb' : '#ffeaa7'};
+            color: ${online ? '#155724' : '#856404'};
+        `;
         document.body.appendChild(indicator);
         
-        // Автоматически скрываем через 3 секунды если онлайн
         if (online) {
             setTimeout(() => {
                 if (indicator.parentNode) {
@@ -90,131 +71,9 @@ class APIService {
         }
     }
     
-    // Автоматическая синхронизация
-    async autoSync() {
-        if (this.isOnline && !this.syncInProgress) {
-            try {
-                // Получаем данные с сервера
-                const serverData = await this.getData();
-                if (serverData) {
-                    // Проверяем нужна ли синхронизация
-                    const localLastSync = localStorage.getItem('lastSyncTime');
-                    const serverLastSync = serverData.lastSync;
-                    
-                    if (!localLastSync || new Date(serverLastSync) > new Date(localLastSync)) {
-                        console.log('📥 Загружаем данные с сервера...');
-                        await this.loadFromServer();
-                    } else {
-                        console.log('📤 Отправляем локальные данные на сервер...');
-                        await this.saveToServer();
-                    }
-                }
-            } catch (error) {
-                console.error('Ошибка автосинхронизации:', error);
-            }
-        }
-    }
-    
-    // Получить все данные с сервера
-    async getData() {
-        if (!this.isOnline) return null;
-        
-        try {
-            const response = await fetch(`${this.baseUrl}/data`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (response.ok) {
-                const result = await response.json();
-                return result.success ? result.data : null;
-            }
-        } catch (error) {
-            console.error('Ошибка получения данных:', error);
-            this.isOnline = false;
-        }
-        return null;
-    }
-    
-    // Сохранить все данные на сервер
-    async saveData(data) {
-        if (!this.isOnline) return false;
-        
-        try {
-            const response = await fetch(`${this.baseUrl}/data`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            });
-            
-            if (response.ok) {
-                const result = await response.json();
-                if (result.success) {
-                    this.lastSyncTime = new Date().toISOString();
-                    localStorage.setItem('lastSyncTime', this.lastSyncTime);
-                    return true;
-                }
-            }
-        } catch (error) {
-            console.error('Ошибка сохранения данных:', error);
-            this.isOnline = false;
-        }
-        return false;
-    }
-    
-    // Загрузить данные с сервера в DataManager
-    async loadFromServer() {
-        if (this.syncInProgress) return false;
-        
-        this.syncInProgress = true;
-        
-        try {
-            const serverData = await this.getData();
-            if (serverData) {
-                // Обновляем DataManager
-                DataManager._data.users = serverData.users || [APP_CONSTANTS.DEFAULTS.ADMIN_USER];
-                DataManager._data.processes = serverData.processes || [];
-                DataManager._data.products = serverData.products || [];
-                DataManager._data.orders = serverData.orders || [];
-                
-                // Проверяем админа
-                const admin = DataManager._data.users.find(u => u.isAdmin);
-                if (!admin) {
-                    DataManager._data.users.unshift(APP_CONSTANTS.DEFAULTS.ADMIN_USER);
-                }
-                
-                // Сохраняем в localStorage
-                DataManager.save();
-                this.lastSyncTime = serverData.lastSync;
-                localStorage.setItem('lastSyncTime', this.lastSyncTime);
-                
-                console.log('✅ Данные загружены с сервера');
-                
-                // Обновляем UI если нужно
-                if (window.BoardModule && typeof BoardModule.renderBoard === 'function') {
-                    BoardModule.renderBoard();
-                }
-                
-                return true;
-            }
-        } catch (error) {
-            console.error('Ошибка загрузки с сервера:', error);
-        } finally {
-            this.syncInProgress = false;
-        }
-        
-        return false;
-    }
-    
-    // Отправить локальные данные на сервер
+    // Простая отправка данных на сервер (без загрузки обратно)
     async saveToServer() {
-        if (this.syncInProgress) return false;
-        
-        this.syncInProgress = true;
+        if (!this.isOnline) return false;
         
         try {
             const localData = {
@@ -224,80 +83,67 @@ class APIService {
                 orders: DataManager._data.orders
             };
             
-            const success = await this.saveData(localData);
-            if (success) {
-                console.log('✅ Данные сохранены на сервер');
-                return true;
+            const response = await fetch(`${this.baseUrl}/data`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(localData)
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    console.log('✅ Данные сохранены на сервер');
+                    return true;
+                }
             }
         } catch (error) {
             console.error('Ошибка отправки на сервер:', error);
-        } finally {
-            this.syncInProgress = false;
         }
-        
         return false;
     }
     
-    // Принудительная синхронизация
+    // Принудительная синхронизация (только отправка)
     async forceSync() {
         if (!this.isOnline) {
             alert('Сервер недоступен. Работаем в автономном режиме.');
             return false;
         }
         
-        if (this.syncInProgress) {
-            alert('Синхронизация уже выполняется...');
-            return false;
-        }
-        
         try {
-            // Показываем индикатор загрузки
             const indicator = document.createElement('div');
             indicator.style.cssText = `
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: white;
-                padding: 20px;
-                border-radius: 8px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                z-index: 10001;
+                position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                background: white; padding: 20px; border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 10001;
+                text-align: center;
             `;
             indicator.innerHTML = `
-                <div style="text-align: center;">
-                    <div style="font-size: 24px; margin-bottom: 10px;">🔄</div>
-                    <div>Синхронизация данных...</div>
-                </div>
+                <div style="font-size: 24px; margin-bottom: 10px;">🔄</div>
+                <div>Отправка данных на сервер...</div>
             `;
             document.body.appendChild(indicator);
             
-            // Отправляем данные на сервер
             const success = await this.saveToServer();
-            
-            // Убираем индикатор
             indicator.remove();
             
             if (success) {
-                alert('✅ Синхронизация завершена успешно');
+                alert('✅ Данные отправлены на сервер');
                 return true;
             } else {
-                alert('❌ Ошибка синхронизации');
+                alert('❌ Ошибка отправки данных');
                 return false;
             }
         } catch (error) {
-            console.error('Ошибка принудительной синхронизации:', error);
+            console.error('Ошибка синхронизации:', error);
             alert('❌ Ошибка синхронизации');
             return false;
         }
     }
     
-    // Получить статус соединения
     getConnectionStatus() {
         return {
             online: this.isOnline,
-            lastSync: this.lastSyncTime,
-            syncInProgress: this.syncInProgress
+            syncInProgress: false
         };
     }
 }

@@ -41,8 +41,8 @@
         console.log('✅ Все модули загружены!');
         
         // Инициализация приложения
-        document.addEventListener('DOMContentLoaded', async () => {
-            await AppModule.init();
+        document.addEventListener('DOMContentLoaded', () => {
+            AppModule.init();
             AppModule.initWindowEvents();
         });
     </script>

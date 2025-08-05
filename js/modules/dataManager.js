@@ -18,7 +18,7 @@ const DataManager = {
     // Сеттеры для данных
     setCurrentUser(user) { this._data.currentUser = user; },
 
-    // Добавление сущностей с автосохранением
+    // Добавление сущностей
     addUser(user) { 
         this._data.users.push(user); 
         this.save();
@@ -42,7 +42,7 @@ const DataManager = {
     findProduct(id) { return this._data.products.find(p => p.id === id); },
     findOrder(id) { return this._data.orders.find(o => o.id === id); },
 
-    // Удаление сущностей с автосохранением
+    // Удаление сущностей
     removeUser(id) { 
         this._data.users = this._data.users.filter(u => u.id !== id); 
         this.save();
@@ -130,7 +130,7 @@ const DataManager = {
         return true;
     },
 
-    // Сохранение данных в localStorage и на сервер
+    // Сохранение данных в localStorage
     save() {
         try {
             const dataToSave = {
@@ -140,25 +140,18 @@ const DataManager = {
                 orders: this._data.orders
             };
             
-            // Сохраняем локально
+            // Сохраняем только локально
             localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.CRM_DATA, JSON.stringify(dataToSave));
             console.log('Данные сохранены локально');
-            
-            // Отправляем на сервер если доступен
-            if (window.APIService && window.APIService.isOnline) {
-                window.APIService.saveToServer().catch(error => {
-                    console.warn('Не удалось сохранить на сервер:', error);
-                });
-            }
         } catch (error) {
             console.error('Ошибка сохранения данных:', error);
         }
     },
 
-    // Загрузка данных из localStorage и обязательная синхронизация с сервером
-    async load() {
+    // Загрузка данных из localStorage
+    load() {
         try {
-            // Сначала загружаем локальные данные
+            // Загружаем локальные данные
             const savedData = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.CRM_DATA);
             if (savedData) {
                 const parsed = JSON.parse(savedData);
@@ -167,79 +160,25 @@ const DataManager = {
                 this._data.products = parsed.products || [];
                 this._data.orders = parsed.orders || [];
                 
-                console.log('💾 Локальные данные загружены');
+                console.log('Данные загружены из localStorage');
             } else {
-                console.log('🎆 Первый запуск - используются данные по умолчанию');
+                console.log('Используются данные по умолчанию');
             }
             
             // Проверяем и восстанавливаем админа если его нет
             const admin = this._data.users.find(u => u.isAdmin);
             if (!admin) {
-                console.log('👤 Админ не найден, создаем заново');
+                console.log('Админ не найден, создаем заново');
                 this._data.users.unshift(APP_CONSTANTS.DEFAULTS.ADMIN_USER);
             }
             
-            // ОБЯЗАТЕЛЬНО пытаемся синхронизироваться с сервером
-            if (window.APIService) {
-                console.log('🔄 Начинаем синхронизацию с сервером...');
-                
-                // Ждем немного для инициализации API сервиса
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                try {
-                    // Проверяем состояние сервера
-                    await window.APIService.checkServerStatus();
-                    
-                    if (window.APIService.isOnline) {
-                        console.log('🌐 Сервер доступен, загружаем данные...');
-                        
-                        // Загружаем данные с сервера
-                        const serverData = await window.APIService.getData();
-                        if (serverData && this.hasData(serverData)) {
-                            console.log('📥 Обновляем данные с сервера');
-                            this._data.users = serverData.users || this._data.users;
-                            this._data.processes = serverData.processes || [];
-                            this._data.products = serverData.products || [];
-                            this._data.orders = serverData.orders || [];
-                        } else if (this.hasData(this._data)) {
-                            console.log('📤 Отправляем локальные данные на сервер');
-                            await window.APIService.saveToServer();
-                        }
-                    } else {
-                        console.log('🟡 Сервер недоступен, работаем офлайн');
-                    }
-                } catch (error) {
-                    console.warn('⚠️ Ошибка синхронизации:', error);
-                }
-            }
-            
-            // Сохраняем локально (без отправки на сервер)
-            this.saveLocal();
+            // Сохраняем локально
+            this.save();
             
         } catch (error) {
-            console.error('❌ Ошибка загрузки данных:', error);
-            console.log('🔄 Используются данные по умолчанию');
-            this.saveLocal();
-        }
-    },
-    
-    // Проверка наличия данных
-    hasData(data) {
-        return data.processes?.length > 0 || data.products?.length > 0 || data.orders?.length > 0;
-    },
-    
-    // Сохранение только локально
-    saveLocal() {
-        try {
-            const dataToSave = {
-                users: this._data.users,
-                processes: this._data.processes,
-                products: this._data.products,
-                orders: this._data.orders
-            };
-            localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.CRM_DATA, JSON.stringify(dataToSave));
-        } catch (error) {
-            console.error('❌ Ошибка локального сохранения:', error);
+            console.error('Ошибка загрузки данных:', error);
+            console.log('Используются данные по умолчанию');
+            this.save();
         }
     },
 

@@ -165,6 +165,7 @@ const DataManager = {
         }
         
         await this.syncWithServer();
+        return order;
     },
 
     // Поиск сущностей
@@ -480,6 +481,13 @@ const DataManager = {
         this._data.orders = [];
         this.saveToCache();
         await this.syncWithServer();
+    },
+
+    // Метод save для совместимости
+    save() {
+        this.saveToCache();
+        this.syncWithServer(); // асинхронная синхронизация
+        console.log('💾 Данные сохранены через save()');
     },
 
     // Создание тестовых данных

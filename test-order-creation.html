@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест создания заказов - Inglass CRM</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .test-container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+        .btn {
+            margin: 5px;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+        .btn-danger { background: #dc3545; color: white; }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .status.error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .status.info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Тест создания заказов</h1>
+        
+        <div id="status" class="status info">
+            🔄 Инициализация системы...
+        </div>
+        
+        <div>
+            <button class="btn btn-primary" onclick="initializeSystem()">🔄 Инициализировать систему</button>
+            <button class="btn btn-success" onclick="createTestData()">📦 Создать тестовые данные</button>
+            <button class="btn btn-warning" onclick="testCreateOrder()">➕ Тест создания заказа</button>
+            <button class="btn btn-danger" onclick="clearLogs()">🗑️ Очистить логи</button>
+        </div>
+        
+        <div id="logs" class="test-log">
+            Ожидание команд...
+        </div>
+    </div>
+
+    <!-- Подключаем модули -->
+    <script src="js/utils/constants.js"></script>
+    <script src="js/utils/phoneUtils.js"></script>
+    <script src="js/utils/orderUtils.js"></script>
+    <script src="js/services/APIService.js"></script>
+    <script src="js/modules/dataManager.js"></script>
+    <script src="js/modules/modalModule.js"></script>
+    <script src="js/modules/boardModule.js"></script>
+    <script src="js/modules/defectModule.js"></script>
+
+    <script>
+        let currentUser = null;
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('logs');
+            const color = type === 'error' ? 'red' : type === 'success' ? 'green' : type === 'warning' ? 'orange' : 'black';
+            logElement.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const statusElement = document.getElementById('status');
+            statusElement.className = `status ${type}`;
+            statusElement.textContent = message;
+            log(message, type);
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = 'Логи очищены...\n';
+        }
+        
+        async function initializeSystem() {
+            try {
+                updateStatus('🔄 Инициализация системы...', 'info');
+                
+                // Загружаем данные
+                await DataManager.load();
+                
+                // Проверяем администратора
+                const admin = DataManager.getUsers().find(u => u.isAdmin);
+                if (!admin) {
+                    log('❌ Администратор не найден!', 'error');
+                    return;
+                }
+                
+                // Устанавливаем текущего пользователя
+                DataManager.setCurrentUser(admin);
+                currentUser = admin;
+                
+                log('✅ Система инициализирована успешно', 'success');
+                log(`👤 Текущий пользователь: ${admin.name} (Админ: ${admin.isAdmin})`, 'info');
+                log(`📊 Пользователей: ${DataManager.getUsers().length}`, 'info');
+                log(`⚙️ Процессов: ${DataManager.getProcesses().length}`, 'info');
+                log(`📦 Изделий: ${DataManager.getProducts().length}`, 'info');
+                log(`📋 Заказов: ${DataManager.getOrders().length}`, 'info');
+                
+                updateStatus('✅ Система готова к работе', 'success');
+                
+            } catch (error) {
+                log(`❌ Ошибка инициализации: ${error.message}`, 'error');
+                updateStatus('❌ Ошибка инициализации', 'error');
+            }
+        }
+        
+        async function createTestData() {
+            try {
+                updateStatus('📦 Создание тестовых данных...', 'info');
+                
+                if (!currentUser) {
+                    log('❌ Сначала инициализируйте систему!', 'error');
+                    return;
+                }
+                
+                // Создаем процессы
+                const processes = [
+                    { id: Date.now() + 1, name: 'Прием заказа', order: 1 },
+                    { id: Date.now() + 2, name: 'Замер', order: 2 },
+                    { id: Date.now() + 3, name: 'Резка', order: 3 },
+                    { id: Date.now() + 4, name: 'Упаковка', order: 4 }
+                ];
+                
+                for (const process of processes) {
+                    await DataManager.addProcess(process);
+                    log(`✅ Процесс "${process.name}" создан (ID: ${process.id})`, 'success');
+                }
+                
+                // Создаем изделия
+                const products = [
+                    { 
+                        id: Date.now() + 10, 
+                        name: 'Стекло', 
+                        processes: processes.map(p => p.id)
+                    },
+                    { 
+                        id: Date.now() + 11, 
+                        name: 'Зеркало', 
+                        processes: [processes[0].id, processes[2].id, processes[3].id]
+                    }
+                ];
+                
+                for (const product of products) {
+                    await DataManager.addProduct(product);
+                    log(`✅ Изделие "${product.name}" создано (ID: ${product.id})`, 'success');
+                }
+                
+                updateStatus('✅ Тестовые данные созданы', 'success');
+                log(`📊 Итого: ${processes.length} процессов, ${products.length} изделий`, 'info');
+                
+            } catch (error) {
+                log(`❌ Ошибка создания тестовых данных: ${error.message}`, 'error');
+                updateStatus('❌ Ошибка создания тестовых данных', 'error');
+            }
+        }
+        
+        async function testCreateOrder() {
+            try {
+                updateStatus('➕ Тестирование создания заказа...', 'info');
+                
+                if (!currentUser) {
+                    log('❌ Сначала инициализируйте систему!', 'error');
+                    return;
+                }
+                
+                const products = DataManager.getProducts();
+                if (products.length === 0) {
+                    log('❌ Нет изделий! Создайте тестовые данные.', 'error');
+                    return;
+                }
+                
+                const product = products[0];
+                log(`📦 Используем изделие: ${product.name} (ID: ${product.id})`, 'info');
+                
+                // Создаем тестовый заказ
+                const testOrder = {
+                    id: Date.now(),
+                    number: OrderUtils.generateOrderNumber(),
+                    productId: product.id,
+                    customerName: 'Тестовый клиент',
+                    customerPhone: new Phone('+7 999 123 4567'),
+                    currentProcessId: product.processes[0],
+                    customFields: { 'Комментарий': 'Тестовый заказ' },
+                    createdAt: new Date().toISOString(),
+                    history: []
+                };
+                
+                log(`📝 Создаем заказ: ${testOrder.number}`, 'info');
+                log(`📞 Телефон: ${testOrder.customerPhone.getFormatted()}`, 'info');
+                log(`⚙️ Первый процесс: ${product.processes[0]}`, 'info');
+                
+                // Добавляем заказ
+                const addedOrder = await DataManager.addOrder(testOrder);
+                
+                if (addedOrder) {
+                    log(`✅ Заказ создан успешно! ID: ${addedOrder.id}`, 'success');
+                    
+                    // Добавляем событие в историю
+                    const firstProcess = DataManager.findProcess(product.processes[0]);
+                    DataManager.addOrderHistoryEvent(testOrder.id, APP_CONSTANTS.EVENT_TYPES.CREATED, {
+                        currentUser: currentUser,
+                        toProcess: { id: product.processes[0], name: firstProcess?.name || 'Неизвестный процесс' }
+                    });
+                    
+                    log(`📝 Событие создания добавлено в историю`, 'info');
+                    
+                    // Проверяем сохранение
+                    const savedOrder = DataManager.findOrder(testOrder.id);
+                    if (savedOrder) {
+                        log(`✅ Заказ найден в базе данных`, 'success');
+                        log(`📊 История заказа: ${savedOrder.history?.length || 0} событий`, 'info');
+                        updateStatus('✅ Заказ создан и сохранен успешно!', 'success');
+                    } else {
+                        log(`❌ Заказ не найден в базе данных после создания!`, 'error');
+                        updateStatus('❌ Ошибка сохранения заказа', 'error');
+                    }
+                    
+                    log(`📊 Всего заказов в системе: ${DataManager.getOrders().length}`, 'info');
+                } else {
+                    log(`❌ Заказ не был создан`, 'error');
+                    updateStatus('❌ Ошибка создания заказа', 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Ошибка тестирования создания заказа: ${error.message}`, 'error');
+                log(`📝 Stack trace: ${error.stack}`, 'error');
+                updateStatus('❌ Ошибка тестирования', 'error');
+            }
+        }
+        
+        // Автоматическая инициализация при загрузке
+        window.addEventListener('load', () => {
+            log('🚀 Страница загружена, готовы к тестированию', 'info');
+        });
+    </script>
+</body>
+</html>

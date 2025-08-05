@@ -425,20 +425,31 @@ const BoardModule = {
                 history: []
             };
             
-            DataManager.addOrder(newOrder);
-            
-            // Добавляем событие создания в историю
-            const firstProcess = DataManager.findProcess(product.processes[0]);
-            DataManager.addOrderHistoryEvent(newOrder.id, APP_CONSTANTS.EVENT_TYPES.CREATED, {
-                currentUser: DataManager.getCurrentUser(),
-                toProcess: { id: product.processes[0], name: firstProcess?.name || 'Неизвестный процесс' }
-            });
-            
-            this.renderProcessBoard();
-            
-            console.log('Заказ добавлен:', newOrder);
-            alert(`✅ Заказ №${newOrder.number} создан!`);
-            return true;
+            try {
+                console.log('📦 Создаем заказ:', newOrder);
+                
+                const addedOrder = await DataManager.addOrder(newOrder);
+                
+                console.log('📦 Заказ добавлен в DataManager:', addedOrder);
+                
+                // Добавляем событие создания в историю
+                const firstProcess = DataManager.findProcess(product.processes[0]);
+                DataManager.addOrderHistoryEvent(newOrder.id, APP_CONSTANTS.EVENT_TYPES.CREATED, {
+                    currentUser: DataManager.getCurrentUser(),
+                    toProcess: { id: product.processes[0], name: firstProcess?.name || 'Неизвестный процесс' }
+                });
+                
+                this.renderProcessBoard();
+                
+                console.log('✅ Заказ успешно создан:', newOrder);
+                alert(`✅ Заказ №${newOrder.number} создан!`);
+                return true;
+                
+            } catch (error) {
+                console.error('❌ Ошибка создания заказа:', error);
+                alert('Ошибка создания заказа: ' + error.message);
+                return false;
+            }
         });
         
         // Применяем маску телефона после показа модального окна
@@ -652,23 +663,7 @@ const BoardModule = {
         });
     },
 
-    // Отбраковка заказа
-    rejectOrder(orderId) {
-        const reason = prompt('Укажите причину отбраковки:');
-        if (!reason || !reason.trim()) {
-            alert('Причина отбраковки обязательна');
-            return;
-        }
-        
-        try {
-            DefectModule.sendOrderToDefect(orderId, null, reason.trim(), true);
-            this.renderProcessBoard();
-            alert(`❌ Заказ отбракован. Причина: ${reason.trim()}`);
-        } catch (error) {
-            console.error('Ошибка отбраковки:', error);
-            alert('Ошибка при отбраковке заказа');
-        }
-    },
+
 
     // Drag & Drop для админа
     draggedOrderId: null,

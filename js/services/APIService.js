@@ -229,20 +229,45 @@ class APIService {
     // Создать сущность на сервере
     async createEntity(entityType, data) {
         if (!this.isOnline) {
+            console.log('Сервер недоступен, не можем создать сущность');
             return false;
         }
         
         try {
+            console.log(`📤 Создаем ${entityType} на сервере:`, data);
+            
+            // Получаем текущие данные с сервера
+            const currentDataResponse = await fetch(`${this.baseUrl}/${entityType}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (!currentDataResponse.ok) {
+                throw new Error(`Ошибка получения данных: ${currentDataResponse.status}`);
+            }
+            
+            const currentResult = await currentDataResponse.json();
+            let currentEntities = currentResult.success ? currentResult.data : [];
+            
+            // Добавляем новую сущность
+            currentEntities.push(data);
+            
+            // Отправляем обновленные данные
             const response = await fetch(`${this.baseUrl}/${entityType}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                body: JSON.stringify(currentEntities)
             });
             
             if (response.ok) {
                 const result = await response.json();
-                return result.success ? result.id : false;
+                if (result.success) {
+                    console.log(`✅ ${entityType} создан на сервере`);
+                    return data.id;
+                }
             }
+            
+            console.warn(`⚠️ Не удалось создать ${entityType} на сервере`);
         } catch (error) {
             console.error(`Ошибка создания ${entityType}:`, error);
         }

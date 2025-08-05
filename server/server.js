@@ -201,9 +201,12 @@ app.post('/api/:entity', (req, res) => {
         const { entity } = req.params;
         const newEntityData = req.body;
         
+        console.log(`📤 Получен запрос на обновление ${entity}:`, newEntityData);
+        
         const data = readData();
         
         if (!data.hasOwnProperty(entity)) {
+            console.error(`Сущность ${entity} не найдена`);
             return res.status(404).json({
                 success: false,
                 error: `Сущность ${entity} не найдена`
@@ -218,6 +221,7 @@ app.post('/api/:entity', (req, res) => {
         const success = writeData(data);
         
         if (success) {
+            console.log(`✅ Сущность ${entity} успешно обновлена`);
             res.json({
                 success: true,
                 message: `Сущность ${entity} успешно обновлена`,
@@ -233,7 +237,8 @@ app.post('/api/:entity', (req, res) => {
         console.error('Ошибка обновления сущности:', error);
         res.status(500).json({
             success: false,
-            error: 'Ошибка обновления данных'
+            error: 'Ошибка обновления данных',
+            details: error.message
         });
     }
 });

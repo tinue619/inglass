@@ -42,7 +42,7 @@ window.fixDefectOrderGlobal = function(orderId, comment) {
         });
         
         // Принудительно сохраняем данные
-        DataManager.save();
+        DataManager.saveToCache();
         
         console.log('✅ Брак устранен для заказа:', order.number);
         
@@ -256,7 +256,7 @@ const DefectModule = {
             console.log('✅ Заказ отправлен в брак:', order);
             
             // Принудительно сохраняем данные
-            DataManager.save();
+            DataManager.saveToCache();
             
             // Не показываем alert здесь, это делается в вызывающей функции
             
@@ -369,7 +369,7 @@ const DefectModule = {
             });
             
             // Принудительно сохраняем данные
-            DataManager.save();
+            DataManager.saveToCache();
             
             console.log('✅ Брак устранен для заказа:', order);
             console.log('🔄 Финальное состояние заказа:', {

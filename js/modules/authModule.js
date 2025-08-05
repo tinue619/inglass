@@ -49,21 +49,52 @@ const AuthModule = {
     },
 
     // Обработка входа
-    handleLogin() {
+    async handleLogin() {
         const selectedCard = document.querySelector('.user-card.selected');
         if (!selectedCard) return;
         
         const userId = parseInt(selectedCard.dataset.userId);
         const password = document.getElementById('passwordInput').value;
         
+        if (!password) {
+            alert('Введите пароль');
+            return;
+        }
+        
         const user = DataManager.findUser(userId);
-        if (user && user.password === password) {
-            DataManager.setCurrentUser(user);
-            DataManager.saveCurrentUser();
-            DataManager.save();
-            AppModule.showMainApp();
-        } else {
-            alert('Неверный пароль');
+        if (!user) {
+            alert('Пользователь не найден');
+            return;
+        }
+        
+        try {
+            // Отправляем запрос на сервер для аутентификации
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    phone: user.phone,
+                    password: password
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Успешная аутентификация
+                DataManager.setCurrentUser(result.user);
+                DataManager.saveCurrentUser();
+                AppModule.showMainApp();
+            } else {
+                // Ошибка аутентификации
+                alert(result.error || 'Ошибка входа');
+                document.getElementById('passwordInput').value = '';
+            }
+        } catch (error) {
+            console.error('Ошибка аутентификации:', error);
+            alert('Ошибка соединения с сервером');
             document.getElementById('passwordInput').value = '';
         }
     },

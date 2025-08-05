@@ -285,6 +285,151 @@ const BoardModule = {
         ModalModule.show(`Заказ №${order.number}`, orderInfo, null);
     },
 
+    // Модальное окно добавления заказа
+    showAddOrderModal() {
+        console.log('Показываем модальное окно добавления заказа');
+        
+        const products = DataManager.getProducts();
+        if (!products || products.length === 0) {
+            alert('Сначала создайте изделия в админ панели');
+            return;
+        }
+        
+        const form = `
+            <div class="form-group">
+                <label>Номер заказа:</label>
+                <input type="text" id="order-number" class="form-input" value="${OrderUtils.generateOrderNumber()}">
+            </div>
+            <div class="form-group">
+                <label>Изделие:</label>
+                <select id="order-product" class="form-input">
+                    <option value="">Выберите изделие</option>
+                    ${products.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Имя клиента:</label>
+                <input type="text" id="order-customer" class="form-input">
+            </div>
+            <div class="form-group">
+                <label>Телефон клиента:</label>
+                <input type="text" id="order-phone" class="form-input" placeholder="+7-(xxx)-xxx-xxxx">
+            </div>
+            <div id="custom-fields"></div>
+            <button type="button" class="btn btn-secondary btn-small" onclick="BoardModule.addCustomField()">+ Добавить поле</button>
+        `;
+        
+        ModalModule.show('Добавить заказ', form, async () => {
+            const number = document.getElementById('order-number').value.trim();
+            const productId = parseInt(document.getElementById('order-product').value);
+            const customerName = document.getElementById('order-customer').value.trim();
+            const customerPhone = document.getElementById('order-phone').value.trim();
+            
+            if (!number || !productId || !customerName || !customerPhone) {
+                alert('Заполните все обязательные поля');
+                return false;
+            }
+            
+            // Валидация телефона
+            if (typeof PhoneUtils !== 'undefined' && PhoneUtils.isValidPhone && !PhoneUtils.isValidPhone(customerPhone)) {
+                alert('Введите корректный номер телефона в формате +7-(xxx)-xxx-xxxx');
+                return false;
+            }
+            
+            // Проверяем уникальность номера
+            if (DataManager.getOrders().some(o => o.number === number)) {
+                alert('Заказ с таким номером уже существует');
+                return false;
+            }
+            
+            const product = DataManager.findProduct(productId);
+            if (!product || product.processes.length === 0) {
+                alert('У выбранного изделия нет процессов');
+                return false;
+            }
+            
+            // Собираем кастомные поля
+            const customFields = {};
+            document.querySelectorAll('.custom-field-row').forEach(row => {
+                const key = row.querySelector('.custom-field-key').value.trim();
+                const value = row.querySelector('.custom-field-value').value.trim();
+                if (key && value) {
+                    customFields[key] = value;
+                }
+            });
+            
+            const newOrder = {
+                id: Date.now(),
+                number: number,
+                productId: productId,
+                customerName: customerName,
+                customerPhone: customerPhone, // Простая строка пока
+                currentProcessId: product.processes[0], // Первый процесс
+                customFields: customFields,
+                createdAt: new Date().toISOString(),
+                history: []
+            };
+            
+            try {
+                console.log('📦 Создаем заказ:', newOrder);
+                
+                const addedOrder = await DataManager.addOrder(newOrder);
+                
+                console.log('📦 Заказ добавлен в DataManager:', addedOrder);
+                
+                // Добавляем событие создания в историю
+                const firstProcess = DataManager.findProcess(product.processes[0]);
+                if (typeof DataManager.addOrderHistoryEvent === 'function') {
+                    DataManager.addOrderHistoryEvent(newOrder.id, 'created', {
+                        currentUser: DataManager.getCurrentUser(),
+                        toProcess: { id: product.processes[0], name: firstProcess?.name || 'Неизвестный процесс' }
+                    });
+                }
+                
+                this.renderProcessBoard();
+                
+                console.log('✅ Заказ успешно создан:', newOrder);
+                alert(`✅ Заказ №${newOrder.number} создан!`);
+                return true;
+                
+            } catch (error) {
+                console.error('❌ Ошибка создания заказа:', error);
+                alert('Ошибка создания заказа: ' + error.message);
+                return false;
+            }
+        });
+        
+        // Применяем маску телефона после показа модального окна
+        setTimeout(() => {
+            const phoneInput = document.getElementById('order-phone');
+            if (phoneInput && typeof PhoneUtils !== 'undefined' && PhoneUtils.applyMask) {
+                PhoneUtils.applyMask(phoneInput);
+            }
+        }, 100);
+    },
+
+    // Добавление кастомного поля
+    addCustomField() {
+        const container = document.getElementById('custom-fields');
+        if (!container) {
+            console.error('Контейнер custom-fields не найден');
+            return;
+        }
+        
+        const fieldRow = document.createElement('div');
+        fieldRow.className = 'custom-field-row';
+        fieldRow.style.cssText = 'display: flex; gap: 10px; margin-bottom: 10px; align-items: center;';
+        
+        fieldRow.innerHTML = `
+            <input type="text" class="custom-field-key form-input" placeholder="Название поля" style="flex: 1;">
+            <input type="text" class="custom-field-value form-input" placeholder="Значение" style="flex: 1;">
+            <button type="button" class="btn btn-danger btn-small" onclick="this.parentElement.remove()">×</button>
+        `;
+        
+        container.appendChild(fieldRow);
+        console.log('Кастомное поле добавлено');
+    },
+
     // Принятие заказа
     approveOrder(orderId) {
         try {

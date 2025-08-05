@@ -1,4 +1,4 @@
-// Управление данными приложения
+// Управление данными приложения (с сервером как основным хранилищем)
 const DataManager = {
     _data: {
         users: [APP_CONSTANTS.DEFAULTS.ADMIN_USER],
@@ -18,22 +18,70 @@ const DataManager = {
     // Сеттеры для данных
     setCurrentUser(user) { this._data.currentUser = user; },
 
-    // Добавление сущностей
-    addUser(user) { 
-        this._data.users.push(user); 
-        this.save();
+    // Добавление сущностей (с отправкой на сервер)
+    async addUser(user) { 
+        this._data.users.push(user);
+        this.saveToCache();
+        
+        // Пытаемся создать на сервере
+        if (window.APIService && window.APIService.isOnline) {
+            const serverId = await window.APIService.createEntity('users', user);
+            if (serverId) {
+                user.id = serverId;
+                console.log('Пользователь создан на сервере с ID:', serverId);
+            }
+        }
+        
+        // Отправляем полный набор данных для синхронизации
+        await this.syncWithServer();
     },
-    addProcess(process) { 
-        this._data.processes.push(process); 
-        this.save();
+    
+    async addProcess(process) { 
+        this._data.processes.push(process);
+        this.saveToCache();
+        
+        // Пытаемся создать на сервере
+        if (window.APIService && window.APIService.isOnline) {
+            const serverId = await window.APIService.createEntity('processes', process);
+            if (serverId) {
+                process.id = serverId;
+                console.log('Процесс создан на сервере с ID:', serverId);
+            }
+        }
+        
+        await this.syncWithServer();
     },
-    addProduct(product) { 
-        this._data.products.push(product); 
-        this.save();
+    
+    async addProduct(product) { 
+        this._data.products.push(product);
+        this.saveToCache();
+        
+        // Пытаемся создать на сервере
+        if (window.APIService && window.APIService.isOnline) {
+            const serverId = await window.APIService.createEntity('products', product);
+            if (serverId) {
+                product.id = serverId;
+                console.log('Изделие создано на сервере с ID:', serverId);
+            }
+        }
+        
+        await this.syncWithServer();
     },
-    addOrder(order) { 
-        this._data.orders.push(order); 
-        this.save();
+    
+    async addOrder(order) { 
+        this._data.orders.push(order);
+        this.saveToCache();
+        
+        // Пытаемся создать на сервере
+        if (window.APIService && window.APIService.isOnline) {
+            const serverId = await window.APIService.createEntity('orders', order);
+            if (serverId) {
+                order.id = serverId;
+                console.log('Заказ создан на сервере с ID:', serverId);
+            }
+        }
+        
+        await this.syncWithServer();
     },
 
     // Поиск сущностей
@@ -42,12 +90,14 @@ const DataManager = {
     findProduct(id) { return this._data.products.find(p => p.id === id); },
     findOrder(id) { return this._data.orders.find(o => o.id === id); },
 
-    // Удаление сущностей
-    removeUser(id) { 
-        this._data.users = this._data.users.filter(u => u.id !== id); 
-        this.save();
+    // Удаление сущностей (с отправкой на сервер)
+    async removeUser(id) { 
+        this._data.users = this._data.users.filter(u => u.id !== id);
+        this.saveToCache();
+        await this.syncWithServer();
     },
-    removeProcess(id) { 
+    
+    async removeProcess(id) { 
         this._data.processes = this._data.processes.filter(p => p.id !== id);
         // Удаляем из изделий
         this._data.products.forEach(product => {
@@ -57,15 +107,20 @@ const DataManager = {
         this._data.users.forEach(user => {
             user.processes = user.processes.filter(pid => pid !== id);
         });
-        this.save();
+        this.saveToCache();
+        await this.syncWithServer();
     },
-    removeProduct(id) { 
-        this._data.products = this._data.products.filter(p => p.id !== id); 
-        this.save();
+    
+    async removeProduct(id) { 
+        this._data.products = this._data.products.filter(p => p.id !== id);
+        this.saveToCache();
+        await this.syncWithServer();
     },
-    removeOrder(id) { 
-        this._data.orders = this._data.orders.filter(o => o.id !== id); 
-        this.save();
+    
+    async removeOrder(id) { 
+        this._data.orders = this._data.orders.filter(o => o.id !== id);
+        this.saveToCache();
+        await this.syncWithServer();
     },
 
     // Работа с историей заказов
@@ -92,13 +147,16 @@ const DataManager = {
         };
         
         order.history.push(historyEvent);
-        this.save();
+        this.saveToCache();
         
         console.log('Добавлено событие в историю:', historyEvent);
+        
+        // Синхронизируем с сервером асинхронно
+        this.syncWithServer();
     },
 
-    // Перемещение заказа между процессами
-    moveOrderToProcess(orderId, newProcessId, reason = null, isDefect = false) {
+    // Перемещение заказа между процессами (с отправкой на сервер)
+    async moveOrderToProcess(orderId, newProcessId, reason = null, isDefect = false) {
         const order = this.findOrder(orderId);
         if (!order) return false;
         
@@ -126,12 +184,30 @@ const DataManager = {
             isDefect: isDefect
         });
         
-        this.save();
+        this.saveToCache();
+        
+        // Отправляем на сервер
+        if (window.APIService && window.APIService.isOnline) {
+            const success = await window.APIService.moveOrder(
+                orderId, 
+                newProcessId, 
+                reason, 
+                isDefect, 
+                this._data.currentUser?.name
+            );
+            
+            if (success) {
+                console.log('Заказ перемещен на сервере');
+            } else {
+                console.warn('Не удалось переместить заказ на сервере, данные сохранены локально');
+            }
+        }
+        
         return true;
     },
 
-    // Сохранение данных в localStorage
-    save() {
+    // Сохранение в localStorage как кэш
+    saveToCache() {
         try {
             const dataToSave = {
                 users: this._data.users,
@@ -140,18 +216,38 @@ const DataManager = {
                 orders: this._data.orders
             };
             
-            // Сохраняем только локально
             localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.CRM_DATA, JSON.stringify(dataToSave));
-            console.log('Данные сохранены локально');
+            console.log('Данные сохранены в кэш (localStorage)');
         } catch (error) {
-            console.error('Ошибка сохранения данных:', error);
+            console.error('Ошибка сохранения в кэш:', error);
         }
     },
 
-    // Загрузка данных из localStorage
-    load() {
+    // Синхронизация с сервером (полная отправка данных)
+    async syncWithServer() {
+        if (window.APIService && window.APIService.isOnline) {
+            await window.APIService.saveToServer();
+        } else {
+            console.log('Сервер недоступен, данные сохранены только в кэш');
+        }
+    },
+
+    // Загрузка данных (сначала с сервера, потом из кэша)
+    async load() {
         try {
-            // Загружаем локальные данные
+            console.log('📥 Загружаем данные...');
+            
+            // Сначала пытаемся загрузить с сервера
+            if (window.APIService) {
+                const serverLoaded = await window.APIService.loadFromServer();
+                if (serverLoaded) {
+                    console.log('✅ Данные загружены с сервера');
+                    return;
+                }
+            }
+            
+            // Если сервер недоступен, загружаем из кэша
+            console.log('📂 Сервер недоступен, загружаем из кэша...');
             const savedData = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.CRM_DATA);
             if (savedData) {
                 const parsed = JSON.parse(savedData);
@@ -160,25 +256,25 @@ const DataManager = {
                 this._data.products = parsed.products || [];
                 this._data.orders = parsed.orders || [];
                 
-                console.log('Данные загружены из localStorage');
+                console.log('✅ Данные загружены из кэша');
             } else {
-                console.log('Используются данные по умолчанию');
+                console.log('📋 Используются данные по умолчанию');
             }
             
             // Проверяем и восстанавливаем админа если его нет
             const admin = this._data.users.find(u => u.isAdmin);
             if (!admin) {
-                console.log('Админ не найден, создаем заново');
+                console.log('👤 Админ не найден, создаем заново');
                 this._data.users.unshift(APP_CONSTANTS.DEFAULTS.ADMIN_USER);
             }
             
-            // Сохраняем локально
-            this.save();
+            // Сохраняем в кэш
+            this.saveToCache();
             
         } catch (error) {
             console.error('Ошибка загрузки данных:', error);
-            console.log('Используются данные по умолчанию');
-            this.save();
+            console.log('📋 Используются данные по умолчанию');
+            this.saveToCache();
         }
     },
 
@@ -217,17 +313,18 @@ const DataManager = {
     },
 
     // Очистка всех данных (кроме админа)
-    clearAll() {
+    async clearAll() {
         const admin = this._data.users.find(u => u.isAdmin);
         this._data.users = admin ? [admin] : [APP_CONSTANTS.DEFAULTS.ADMIN_USER];
         this._data.processes = [];
         this._data.products = [];
         this._data.orders = [];
-        this.save();
+        this.saveToCache();
+        await this.syncWithServer();
     },
 
     // Создание тестовых данных
-    createTestData() {
+    async createTestData() {
         const processes = [
             { id: Date.now() + 1, name: 'Прием заказа', order: 1 },
             { id: Date.now() + 2, name: 'Замер', order: 2 },
@@ -261,11 +358,22 @@ const DataManager = {
             }
         ];
         
-        processes.forEach(p => this.addProcess(p));
-        products.forEach(p => this.addProduct(p));
-        users.forEach(u => this.addUser(u));
+        // Добавляем процессы
+        for (const process of processes) {
+            await this.addProcess(process);
+        }
         
-        this.save();
+        // Добавляем изделия
+        for (const product of products) {
+            await this.addProduct(product);
+        }
+        
+        // Добавляем пользователей
+        for (const user of users) {
+            await this.addUser(user);
+        }
+        
+        console.log('✅ Тестовые данные созданы');
     }
 };
 
@@ -273,8 +381,8 @@ const DataManager = {
 window.DataManager = DataManager;
 window.data = DataManager._data;
 
-// Экспорт старых функций для совместимости
-window.saveData = () => DataManager.save();
+// Экспорт функций для совместимости
+window.saveData = () => DataManager.saveToCache();
 window.loadData = () => DataManager.load();
 window.saveCurrentUser = () => DataManager.saveCurrentUser();
 window.loadCurrentUser = () => DataManager.loadCurrentUser();

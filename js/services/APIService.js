@@ -1,13 +1,16 @@
-// Упрощенный сервис для работы с API сервера
+// Сервис для работы с сервером как основным хранилищем данных
 class APIService {
     constructor() {
         this.baseUrl = this.getBaseUrl();
         this.isOnline = false;
+        this.retryCount = 0;
+        this.maxRetries = 3;
+        
         console.log('🌐 API Service инициализирован, базовый URL:', this.baseUrl);
         
         // Проверяем доступность сервера
         this.checkServerStatus();
-        setInterval(() => this.checkServerStatus(), 30000);
+        setInterval(() => this.checkServerStatus(), 15000); // каждые 15 секунд
     }
     
     getBaseUrl() {
@@ -29,15 +32,19 @@ class APIService {
             if (response.ok) {
                 const result = await response.json();
                 if (result.success && !this.isOnline) {
-                    console.log('🟢 Сервер доступен');
+                    console.log('🟢 Сервер доступен, переключаемся в онлайн режим');
                     this.isOnline = true;
+                    this.retryCount = 0;
                     this.showConnectionStatus(true);
+                    
+                    // При восстановлении соединения загружаем данные с сервера
+                    await this.loadFromServer();
                 }
                 return true;
             }
         } catch (error) {
             if (this.isOnline) {
-                console.log('🔴 Сервер недоступен, работаем локально');
+                console.log('🔴 Сервер недоступен, переключаемся в автономный режим');
                 this.isOnline = false;
                 this.showConnectionStatus(false);
             }
@@ -51,7 +58,7 @@ class APIService {
         
         const indicator = document.createElement('div');
         indicator.className = `connection-status ${online ? 'online' : 'offline'}`;
-        indicator.textContent = online ? '🟢 Онлайн' : '🟡 Автономно';
+        indicator.textContent = online ? '🟢 Онлайн (Сервер)' : '🟡 Автономно (Кэш)';
         indicator.style.cssText = `
             position: fixed; top: 20px; right: 20px; z-index: 1000;
             padding: 8px 12px; border-radius: 4px; font-size: 12px;
@@ -71,11 +78,73 @@ class APIService {
         }
     }
     
-    // Простая отправка данных на сервер (без загрузки обратно)
+    // Загрузить данные с сервера
+    async loadFromServer() {
+        try {
+            if (!this.isOnline) {
+                console.log('Сервер недоступен, используем локальный кэш');
+                return false;
+            }
+            
+            console.log('📥 Загружаем данные с сервера...');
+            
+            const response = await fetch(`${this.baseUrl}/data`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success && result.data) {
+                    const serverData = result.data;
+                    
+                    // Обновляем DataManager данными с сервера
+                    DataManager._data.users = serverData.users || [APP_CONSTANTS.DEFAULTS.ADMIN_USER];
+                    DataManager._data.processes = serverData.processes || [];
+                    DataManager._data.products = serverData.products || [];
+                    DataManager._data.orders = serverData.orders || [];
+                    
+                    // Проверяем админа
+                    const admin = DataManager._data.users.find(u => u.isAdmin);
+                    if (!admin) {
+                        DataManager._data.users.unshift(APP_CONSTANTS.DEFAULTS.ADMIN_USER);
+                    }
+                    
+                    // Сохраняем в localStorage как кэш
+                    DataManager.saveToCache();
+                    
+                    console.log('✅ Данные загружены с сервера');
+                    console.log(`👥 Пользователей: ${DataManager._data.users.length}`);
+                    console.log(`⚙️ Процессов: ${DataManager._data.processes.length}`);
+                    console.log(`📦 Изделий: ${DataManager._data.products.length}`);
+                    console.log(`📋 Заказов: ${DataManager._data.orders.length}`);
+                    
+                    // Обновляем UI если нужно
+                    if (window.BoardModule && typeof BoardModule.renderBoard === 'function') {
+                        BoardModule.renderBoard();
+                    }
+                    
+                    return true;
+                }
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки с сервера:', error);
+            this.isOnline = false;
+        }
+        
+        return false;
+    }
+    
+    // Отправить данные на сервер
     async saveToServer() {
-        if (!this.isOnline) return false;
+        if (!this.isOnline) {
+            console.log('Сервер недоступен, данные сохранены только в кэш');
+            return false;
+        }
         
         try {
+            console.log('📤 Отправляем данные на сервер...');
+            
             const localData = {
                 users: DataManager._data.users,
                 processes: DataManager._data.processes,
@@ -92,21 +161,37 @@ class APIService {
             if (response.ok) {
                 const result = await response.json();
                 if (result.success) {
-                    console.log('✅ Данные сохранены на сервер');
+                    console.log('✅ Данные отправлены на сервер');
+                    this.retryCount = 0;
+                    
+                    // Обновляем кэш после успешной отправки
+                    DataManager.saveToCache();
                     return true;
                 }
             }
         } catch (error) {
             console.error('Ошибка отправки на сервер:', error);
+            this.retryCount++;
+            
+            if (this.retryCount >= this.maxRetries) {
+                this.isOnline = false;
+                this.showConnectionStatus(false);
+                console.log('Превышено количество попыток, переключаемся в автономный режим');
+            }
         }
+        
         return false;
     }
     
-    // Принудительная синхронизация (только отправка)
+    // Принудительная синхронизация
     async forceSync() {
         if (!this.isOnline) {
-            alert('Сервер недоступен. Работаем в автономном режиме.');
-            return false;
+            // Проверяем доступность сервера
+            const serverAvailable = await this.checkServerStatus();
+            if (!serverAvailable) {
+                alert('Сервер недоступен. Данные работают только в автономном режиме.');
+                return false;
+            }
         }
         
         try {
@@ -119,31 +204,120 @@ class APIService {
             `;
             indicator.innerHTML = `
                 <div style="font-size: 24px; margin-bottom: 10px;">🔄</div>
-                <div>Отправка данных на сервер...</div>
+                <div>Синхронизация с сервером...</div>
             `;
             document.body.appendChild(indicator);
             
-            const success = await this.saveToServer();
+            // Сначала загружаем актуальные данные с сервера
+            const loadSuccess = await this.loadFromServer();
+            
+            // Затем отправляем локальные изменения на сервер
+            const saveSuccess = await this.saveToServer();
+            
             indicator.remove();
             
-            if (success) {
+            if (loadSuccess && saveSuccess) {
+                alert('✅ Синхронизация завершена успешно');
+                return true;
+            } else if (loadSuccess) {
+                alert('✅ Данные загружены с сервера');
+                return true;
+            } else if (saveSuccess) {
                 alert('✅ Данные отправлены на сервер');
                 return true;
             } else {
-                alert('❌ Ошибка отправки данных');
+                alert('⚠️ Частичная синхронизация или ошибка');
                 return false;
             }
         } catch (error) {
-            console.error('Ошибка синхронизации:', error);
+            console.error('Ошибка принудительной синхронизации:', error);
             alert('❌ Ошибка синхронизации');
             return false;
         }
     }
     
+    // Создать сущность на сервере
+    async createEntity(entityType, data) {
+        if (!this.isOnline) {
+            return false;
+        }
+        
+        try {
+            const response = await fetch(`${this.baseUrl}/${entityType}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                return result.success ? result.id : false;
+            }
+        } catch (error) {
+            console.error(`Ошибка создания ${entityType}:`, error);
+        }
+        
+        return false;
+    }
+    
+    // Обновить сущность на сервере
+    async updateEntity(entityType, id, data) {
+        if (!this.isOnline) {
+            return false;
+        }
+        
+        try {
+            const response = await fetch(`${this.baseUrl}/${entityType}/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                return result.success;
+            }
+        } catch (error) {
+            console.error(`Ошибка обновления ${entityType}:`, error);
+        }
+        
+        return false;
+    }
+    
+    // Переместить заказ
+    async moveOrder(orderId, processId, reason, isDefect, userName) {
+        if (!this.isOnline) {
+            return false;
+        }
+        
+        try {
+            const response = await fetch(`${this.baseUrl}/orders/${orderId}/move`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    processId,
+                    reason,
+                    isDefect,
+                    userName
+                })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                return result.success;
+            }
+        } catch (error) {
+            console.error('Ошибка перемещения заказа:', error);
+        }
+        
+        return false;
+    }
+    
     getConnectionStatus() {
         return {
             online: this.isOnline,
-            syncInProgress: false
+            retryCount: this.retryCount,
+            maxRetries: this.maxRetries
         };
     }
 }

@@ -79,12 +79,12 @@ const AppModule = {
     },
 
     // Инициализация приложения
-    init() {
+    async init() {
         console.log('App started');
         
         try {
-            // Загружаем данные
-            DataManager.load();
+            // Загружаем данные (асинхронно с сервера или из кэша)
+            await DataManager.load();
             
             // Пытаемся загрузить текущего пользователя
             if (DataManager.loadCurrentUser()) {

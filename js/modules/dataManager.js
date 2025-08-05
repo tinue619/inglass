@@ -18,11 +18,23 @@ const DataManager = {
     // Сеттеры для данных
     setCurrentUser(user) { this._data.currentUser = user; },
 
-    // Добавление сущностей
-    addUser(user) { this._data.users.push(user); },
-    addProcess(process) { this._data.processes.push(process); },
-    addProduct(product) { this._data.products.push(product); },
-    addOrder(order) { this._data.orders.push(order); },
+    // Добавление сущностей с автосохранением
+    addUser(user) { 
+        this._data.users.push(user); 
+        this.save();
+    },
+    addProcess(process) { 
+        this._data.processes.push(process); 
+        this.save();
+    },
+    addProduct(product) { 
+        this._data.products.push(product); 
+        this.save();
+    },
+    addOrder(order) { 
+        this._data.orders.push(order); 
+        this.save();
+    },
 
     // Поиск сущностей
     findUser(id) { return this._data.users.find(u => u.id === id); },
@@ -30,8 +42,11 @@ const DataManager = {
     findProduct(id) { return this._data.products.find(p => p.id === id); },
     findOrder(id) { return this._data.orders.find(o => o.id === id); },
 
-    // Удаление сущностей
-    removeUser(id) { this._data.users = this._data.users.filter(u => u.id !== id); },
+    // Удаление сущностей с автосохранением
+    removeUser(id) { 
+        this._data.users = this._data.users.filter(u => u.id !== id); 
+        this.save();
+    },
     removeProcess(id) { 
         this._data.processes = this._data.processes.filter(p => p.id !== id);
         // Удаляем из изделий
@@ -42,9 +57,16 @@ const DataManager = {
         this._data.users.forEach(user => {
             user.processes = user.processes.filter(pid => pid !== id);
         });
+        this.save();
     },
-    removeProduct(id) { this._data.products = this._data.products.filter(p => p.id !== id); },
-    removeOrder(id) { this._data.orders = this._data.orders.filter(o => o.id !== id); },
+    removeProduct(id) { 
+        this._data.products = this._data.products.filter(p => p.id !== id); 
+        this.save();
+    },
+    removeOrder(id) { 
+        this._data.orders = this._data.orders.filter(o => o.id !== id); 
+        this.save();
+    },
 
     // Работа с историей заказов
     addOrderHistoryEvent(orderId, eventType, eventData = {}) {
@@ -133,7 +155,7 @@ const DataManager = {
         }
     },
 
-    // Загрузка данных из localStorage и попытка синхронизации с сервером
+    // Загрузка данных из localStorage и обязательная синхронизация с сервером
     async load() {
         try {
             // Сначала загружаем локальные данные
@@ -145,35 +167,79 @@ const DataManager = {
                 this._data.products = parsed.products || [];
                 this._data.orders = parsed.orders || [];
                 
-                console.log('Данные загружены из localStorage');
+                console.log('💾 Локальные данные загружены');
             } else {
-                console.log('Используются данные по умолчанию');
+                console.log('🎆 Первый запуск - используются данные по умолчанию');
             }
             
             // Проверяем и восстанавливаем админа если его нет
             const admin = this._data.users.find(u => u.isAdmin);
             if (!admin) {
-                console.log('Админ не найден, создаем заново');
+                console.log('👤 Админ не найден, создаем заново');
                 this._data.users.unshift(APP_CONSTANTS.DEFAULTS.ADMIN_USER);
             }
             
-            // Сохраняем локально
-            this.save();
-            
-            // Пытаемся синхронизироваться с сервером
+            // ОБЯЗАТЕЛЬНО пытаемся синхронизироваться с сервером
             if (window.APIService) {
-                // Ждем небольшой таймаут для инициализации API сервиса
-                setTimeout(() => {
+                console.log('🔄 Начинаем синхронизацию с сервером...');
+                
+                // Ждем немного для инициализации API сервиса
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                try {
+                    // Проверяем состояние сервера
+                    await window.APIService.checkServerStatus();
+                    
                     if (window.APIService.isOnline) {
-                        window.APIService.autoSync();
+                        console.log('🌐 Сервер доступен, загружаем данные...');
+                        
+                        // Загружаем данные с сервера
+                        const serverData = await window.APIService.getData();
+                        if (serverData && this.hasData(serverData)) {
+                            console.log('📥 Обновляем данные с сервера');
+                            this._data.users = serverData.users || this._data.users;
+                            this._data.processes = serverData.processes || [];
+                            this._data.products = serverData.products || [];
+                            this._data.orders = serverData.orders || [];
+                        } else if (this.hasData(this._data)) {
+                            console.log('📤 Отправляем локальные данные на сервер');
+                            await window.APIService.saveToServer();
+                        }
+                    } else {
+                        console.log('🟡 Сервер недоступен, работаем офлайн');
                     }
-                }, 1000);
+                } catch (error) {
+                    console.warn('⚠️ Ошибка синхронизации:', error);
+                }
             }
             
+            // Сохраняем локально (без отправки на сервер)
+            this.saveLocal();
+            
         } catch (error) {
-            console.error('Ошибка загрузки данных:', error);
-            console.log('Используются данные по умолчанию');
-            this.save();
+            console.error('❌ Ошибка загрузки данных:', error);
+            console.log('🔄 Используются данные по умолчанию');
+            this.saveLocal();
+        }
+    },
+    
+    // Проверка наличия данных
+    hasData(data) {
+        return data.processes?.length > 0 || data.products?.length > 0 || data.orders?.length > 0;
+    },
+    
+    // Сохранение только локально
+    saveLocal() {
+        try {
+            const dataToSave = {
+                users: this._data.users,
+                processes: this._data.processes,
+                products: this._data.products,
+                orders: this._data.orders
+            };
+            localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.CRM_DATA, JSON.stringify(dataToSave));
+        } catch (error) {
+            console.error('❌ Ошибка локального сохранения:', error);
         }
     },
 

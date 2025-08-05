@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Диагностика поля order</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .warning { background: #fff3cd; color: #856404; }
+        .process-info { background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 8px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Диагностика поля order у процессов</h1>
+    
+    <div>
+        <button onclick="runOrderTest()">🧪 Запустить тест order</button>
+        <button onclick="createTestProcess()">➕ Создать тестовый процесс</button>
+        <button onclick="clearResults()">🗑️ Очистить лог</button>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script src="js/utils/constants.js"></script>
+    <script src="js/services/APIService.js"></script>
+    <script src="js/modules/dataManager.js"></script>
+    
+    <script>
+        const results = document.getElementById('results');
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+            console.log(`[${type}] ${message}`);
+        }
+        
+        function addProcessInfo(process) {
+            const div = document.createElement('div');
+            div.className = 'process-info';
+            div.innerHTML = `
+                <strong>Процесс:</strong><br>
+                ID: ${process.id}<br>
+                Name: ${process.name}<br>
+                Order: ${process.order} (${typeof process.order})<br>
+                JSON: ${JSON.stringify(process, null, 2)}
+            `;
+            results.appendChild(div);
+        }
+        
+        function clearResults() {
+            results.innerHTML = '';
+        }
+        
+        async function createTestProcess() {
+            try {
+                const testProcess = {
+                    id: Date.now(),
+                    name: `Тестовый процесс ${Date.now()}`,
+                    order: 99
+                };
+                
+                addResult(`🔧 Создаем тестовый процесс с order = ${testProcess.order}`, 'info');
+                addProcessInfo(testProcess);
+                
+                await DataManager.addProcess(testProcess);
+                addResult('✅ Процесс добавлен в DataManager', 'success');
+                
+                // Проверяем что процесс сохранился
+                const foundProcess = DataManager.findProcess(testProcess.id);
+                if (foundProcess) {
+                    addResult(`✅ Процесс найден в памяти`, 'success');
+                    addProcessInfo(foundProcess);
+                } else {
+                    addResult('❌ Процесс не найден в памяти!', 'error');
+                }
+                
+                await runOrderTest();
+                
+            } catch (error) {
+                addResult(`❌ Ошибка создания процесса: ${error.message}`, 'error');
+            }
+        }
+        
+        async function runOrderTest() {
+            addResult('🚀 ТЕСТ ПОЛЯ ORDER', 'info');
+            
+            try {
+                // Шаг 1: Проверка текущих процессов
+                const processes = DataManager.getProcesses();
+                addResult(`📊 Найдено процессов: ${processes.length}`, 'info');
+                
+                processes.forEach((process, index) => {
+                    addResult(`Процесс ${index + 1}: ${process.name}, order = ${process.order} (${typeof process.order})`, 
+                             process.order === undefined ? 'error' : 'success');
+                    addProcessInfo(process);
+                });
+                
+                // Шаг 2: Проверка localStorage
+                addResult('💾 Проверяем localStorage...', 'info');
+                const savedData = localStorage.getItem('crmData');
+                if (savedData) {
+                    try {
+                        const parsed = JSON.parse(savedData);
+                        if (parsed.processes && Array.isArray(parsed.processes)) {
+                            addResult(`💾 В localStorage найдено ${parsed.processes.length} процессов`, 'info');
+                            parsed.processes.forEach((process, index) => {
+                                addResult(`localStorage процесс ${index + 1}: ${process.name}, order = ${process.order} (${typeof process.order})`, 
+                                         process.order === undefined ? 'error' : 'success');
+                            });
+                        }
+                    } catch (parseError) {
+                        addResult(`❌ Ошибка парсинга localStorage: ${parseError.message}`, 'error');
+                    }
+                } else {
+                    addResult('📭 localStorage пуст', 'warning');
+                }
+                
+                // Шаг 3: Тест сохранения и перезагрузки
+                addResult('🔄 Тест сохранения и перезагрузки...', 'info');
+                
+                // Сохраняем текущее состояние процессов
+                const beforeReload = DataManager.getProcesses().map(p => ({ 
+                    id: p.id, 
+                    name: p.name, 
+                    order: p.order 
+                }));
+                
+                addResult(`📝 Сохраняем состояние: ${beforeReload.length} процессов`, 'info');
+                
+                // Принудительно сохраняем
+                DataManager.saveToCache();
+                
+                // Очищаем память
+                DataManager._data.processes = [];
+                addResult('🗑️ Очищена память процессов', 'warning');
+                
+                // Перезагружаем
+                await DataManager.load();
+                addResult('📥 Данные перезагружены', 'info');
+                
+                // Проверяем что восстановилось
+                const afterReload = DataManager.getProcesses();
+                addResult(`📊 После перезагрузки: ${afterReload.length} процессов`, 'info');
+                
+                afterReload.forEach((process, index) => {
+                    const originalProcess = beforeReload.find(p => p.id === process.id);
+                    const orderMatches = originalProcess && originalProcess.order === process.order;
+                    
+                    addResult(`Процесс ${index + 1}: ${process.name}`, 'info');
+                    addResult(`  Было: order = ${originalProcess ? originalProcess.order : 'НЕТ'} (${typeof originalProcess?.order})`, 'info');
+                    addResult(`  Стало: order = ${process.order} (${typeof process.order})`, process.order === undefined ? 'error' : 'success');
+                    addResult(`  Совпадает: ${orderMatches ? '✅' : '❌'}`, orderMatches ? 'success' : 'error');
+                    
+                    addProcessInfo(process);
+                });
+                
+                // Шаг 4: Тест updateFromServer
+                addResult('🌐 Тест updateFromServer...', 'info');
+                
+                const testServerData = {
+                    processes: [
+                        { id: 9001, name: 'Серверный процесс 1', order: 10 },
+                        { id: 9002, name: 'Серверный процесс 2', order: 20 },
+                        { id: 9003, name: 'Серверный процесс без order' } // Намеренно без order
+                    ],
+                    users: DataManager.getUsers(),
+                    products: DataManager.getProducts(),
+                    orders: DataManager.getOrders()
+                };
+                
+                addResult('📤 Отправляем тестовые данные с сервера...', 'info');
+                const updateSuccess = DataManager.updateFromServer(testServerData);
+                
+                if (updateSuccess) {
+                    addResult('✅ updateFromServer завершен успешно', 'success');
+                    
+                    const serverProcesses = DataManager.getProcesses();
+                    addResult(`📊 После updateFromServer: ${serverProcesses.length} процессов`, 'info');
+                    
+                    serverProcesses.forEach((process, index) => {
+                        addResult(`Серверный процесс ${index + 1}: ${process.name}, order = ${process.order} (${typeof process.order})`, 
+                                 process.order === undefined ? 'error' : 'success');
+                        addProcessInfo(process);
+                    });
+                } else {
+                    addResult('❌ updateFromServer завершен с ошибкой', 'error');
+                }
+                
+                addResult('🎉 ТЕСТ ЗАВЕРШЕН', 'success');
+                
+            } catch (error) {
+                addResult(`❌ Критическая ошибка теста: ${error.message}`, 'error');
+                console.error('Ошибка теста order:', error);
+            }
+        }
+        
+        // Автозапуск через 1 секунду
+        setTimeout(() => {
+            addResult('🎯 Система готова к тестированию поля order', 'info');
+        }, 1000);
+        
+    </script>
+</body>
+</html>

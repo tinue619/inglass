@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>✅ Тест исправления order</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .fixed { background: #28a745; color: white; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>✅ Проверка исправления поля order</h1>
+    <p>Проверяем, что поле order теперь корректно сохраняется и загружается.</p>
+    
+    <div>
+        <button onclick="testOrderFix()">🧪 Тест исправления</button>
+        <button onclick="simulateServerSync()">🌐 Тест синхронизации с сервером</button>
+        <button onclick="clearResults()">🗑️ Очистить</button>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script src="js/utils/constants.js"></script>
+    <script src="js/services/APIService.js"></script>
+    <script src="js/modules/dataManager.js"></script>
+    
+    <script>
+        const results = document.getElementById('results');
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+        
+        function clearResults() {
+            results.innerHTML = '';
+        }
+        
+        async function testOrderFix() {
+            addResult('🚀 ТЕСТИРУЕМ ИСПРАВЛЕНИЕ ПОЛЯ ORDER', 'info');
+            
+            try {
+                // Создаем процесс с order = 0 (проверяем что 0 не превращается в 1)
+                const testProcesses = [
+                    { id: Date.now() + 1, name: 'Процесс с order = 0', order: 0 },
+                    { id: Date.now() + 2, name: 'Процесс с order = 5', order: 5 },
+                    { id: Date.now() + 3, name: 'Процесс с order = 10', order: 10 }
+                ];
+                
+                addResult('➕ Создаем тестовые процессы...', 'info');
+                
+                for (const process of testProcesses) {
+                    await DataManager.addProcess(process);
+                    addResult(`Создан: ${process.name} с order = ${process.order}`, 'success');
+                }
+                
+                // Проверяем что процессы сохранились с правильным order
+                const savedProcesses = DataManager.getProcesses();
+                addResult(`📊 Найдено процессов: ${savedProcesses.length}`, 'info');
+                
+                let allOrdersCorrect = true;
+                
+                for (const testProcess of testProcesses) {
+                    const found = savedProcesses.find(p => p.id === testProcess.id);
+                    if (found) {
+                        if (found.order === testProcess.order) {
+                            addResult(`✅ ${found.name}: order = ${found.order} (ПРАВИЛЬНО)`, 'success');
+                        } else {
+                            addResult(`❌ ${found.name}: order = ${found.order}, ожидалось ${testProcess.order}`, 'error');
+                            allOrdersCorrect = false;
+                        }
+                    } else {
+                        addResult(`❌ Процесс ${testProcess.name} не найден!`, 'error');
+                        allOrdersCorrect = false;
+                    }
+                }
+                
+                // Тест перезагрузки
+                addResult('🔄 Тестируем перезагрузку данных...', 'info');
+                
+                // Сохраняем в кэш
+                DataManager.saveToCache();
+                
+                // Очищаем память
+                DataManager._data.processes = [];
+                
+                // Перезагружаем
+                await DataManager.load();
+                
+                const reloadedProcesses = DataManager.getProcesses();
+                addResult(`📥 После перезагрузки: ${reloadedProcesses.length} процессов`, 'info');
+                
+                for (const testProcess of testProcesses) {
+                    const found = reloadedProcesses.find(p => p.id === testProcess.id);
+                    if (found) {
+                        if (found.order === testProcess.order) {
+                            addResult(`✅ После перезагрузки ${found.name}: order = ${found.order} (СОХРАНИЛСЯ)`, 'success');
+                        } else {
+                            addResult(`❌ После перезагрузки ${found.name}: order = ${found.order}, ожидалось ${testProcess.order}`, 'error');
+                            allOrdersCorrect = false;
+                        }
+                    }
+                }
+                
+                if (allOrdersCorrect) {
+                    addResult('🎉 ВСЕ ТЕСТЫ ПРОЙДЕНЫ! ПРОБЛЕМА ИСПРАВЛЕНА!', 'fixed');
+                } else {
+                    addResult('💥 НЕКОТОРЫЕ ТЕСТЫ НЕ ПРОЙДЕНЫ', 'error');
+                }
+                
+            } catch (error) {
+                addResult(`❌ Ошибка теста: ${error.message}`, 'error');
+            }
+        }
+        
+        async function simulateServerSync() {
+            addResult('🌐 ТЕСТИРУЕМ СИНХРОНИЗАЦИЮ С СЕРВЕРОМ', 'info');
+            
+            try {
+                // Симулируем данные с сервера
+                const serverData = {
+                    processes: [
+                        { id: 5001, name: 'Серверный процесс A', order: 0 }, // Тест order = 0
+                        { id: 5002, name: 'Серверный процесс B', order: 3 },
+                        { id: 5003, name: 'Серверный процесс C', order: 7 }
+                    ],
+                    users: DataManager.getUsers(),
+                    products: DataManager.getProducts(),
+                    orders: DataManager.getOrders()
+                };
+                
+                addResult('📤 Симулируем обновление с сервера...', 'info');
+                const success = DataManager.updateFromServer(serverData);
+                
+                if (success) {
+                    addResult('✅ updateFromServer успешно', 'success');
+                    
+                    const processes = DataManager.getProcesses();
+                    addResult(`📊 Процессов после синхронизации: ${processes.length}`, 'info');
+                    
+                    let syncCorrect = true;
+                    
+                    for (const serverProcess of serverData.processes) {
+                        const found = processes.find(p => p.id === serverProcess.id);
+                        if (found) {
+                            if (found.order === serverProcess.order) {
+                                addResult(`✅ ${found.name}: order = ${found.order} (СИНХРОНИЗИРОВАН)`, 'success');
+                            } else {
+                                addResult(`❌ ${found.name}: order = ${found.order}, ожидалось ${serverProcess.order}`, 'error');
+                                syncCorrect = false;
+                            }
+                        } else {
+                            addResult(`❌ Серверный процесс ${serverProcess.name} не найден!`, 'error');
+                            syncCorrect = false;
+                        }
+                    }
+                    
+                    if (syncCorrect) {
+                        addResult('🎉 СИНХРОНИЗАЦИЯ С СЕРВЕРОМ РАБОТАЕТ ПРАВИЛЬНО!', 'fixed');
+                    } else {
+                        addResult('💥 ПРОБЛЕМЫ С СИНХРОНИЗАЦИЕЙ', 'error');
+                    }
+                    
+                } else {
+                    addResult('❌ updateFromServer завершился с ошибкой', 'error');
+                }
+                
+            } catch (error) {
+                addResult(`❌ Ошибка синхронизации: ${error.message}`, 'error');
+            }
+        }
+        
+        // Автозапуск
+        setTimeout(() => {
+            addResult('🎯 Готов к тестированию исправления!', 'info');
+            addResult('💡 Нажмите "Тест исправления" для проверки', 'info');
+        }, 1000);
+        
+    </script>
+</body>
+</html>

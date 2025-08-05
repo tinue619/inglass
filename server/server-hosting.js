@@ -115,7 +115,7 @@ app.post('/api/data', async (req, res) => {
             for (const process of newData.processes) {
                 await db.createProcess({
                     name: process.name,
-                    order: process.order || 1
+                    order: process.order !== undefined ? process.order : 1 // Правильная проверка undefined
                 });
             }
         }

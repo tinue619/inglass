@@ -172,7 +172,13 @@ class DatabaseManager {
 
     // ПРОЦЕССЫ
     async getProcesses() {
-        return await this.all('SELECT * FROM processes ORDER BY order_num');
+        const processes = await this.all('SELECT * FROM processes ORDER BY order_num');
+        return processes.map(process => ({
+            id: process.id,
+            name: process.name,
+            order: process.order_num, // Маппинг order_num -> order
+            description: process.description
+        }));
     }
 
     async createProcess(processData) {

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Диагностика undefined данных</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .log { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0; font-family: monospace; white-space: pre-wrap; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warn { background: #fff3cd; color: #856404; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Диагностика проблемы с undefined данными</h1>
+    
+    <div>
+        <button onclick="startDiagnostic()">🔄 Запустить диагностику</button>
+        <button onclick="clearLogs()">🗑️ Очистить логи</button>
+    </div>
+    
+    <div id="logs"></div>
+    
+    <script src="js/utils/constants.js"></script>
+    <script src="js/services/APIService.js"></script>
+    <script src="js/modules/dataManager.js"></script>
+    
+    <script>
+        const logs = document.getElementById('logs');
+        
+        function addLog(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `log ${type}`;
+            div.textContent = `${new Date().toISOString()} - ${message}`;
+            logs.appendChild(div);
+            logs.scrollTop = logs.scrollHeight;
+            console.log(`[${type}] ${message}`);
+        }
+        
+        function clearLogs() {
+            logs.innerHTML = '';
+        }
+        
+        // Перехватываем все обращения к DataManager._data
+        const originalData = DataManager._data;
+        
+        // Создаем Proxy для отслеживания изменений
+        DataManager._data = new Proxy(originalData, {
+            get(target, prop) {
+                const value = target[prop];
+                addLog(`ЧТЕНИЕ DataManager._data.${prop} = ${Array.isArray(value) ? `Array(${value.length})` : typeof value}`, 'info');
+                return value;
+            },
+            
+            set(target, prop, value) {
+                const oldValue = target[prop];
+                const oldType = Array.isArray(oldValue) ? `Array(${oldValue.length})` : typeof oldValue;
+                const newType = Array.isArray(value) ? `Array(${value.length})` : typeof value;
+                
+                addLog(`ЗАПИСЬ DataManager._data.${prop}: ${oldType} → ${newType}`, 'warn');
+                
+                // Проверяем на undefined
+                if (value === undefined) {
+                    addLog(`❌ ОПАСНО! ${prop} становится undefined!`, 'error');
+                    console.trace(`DataManager._data.${prop} = undefined`);
+                }
+                
+                target[prop] = value;
+                return true;
+            }
+        });
+        
+        // Перехватываем вызовы методов DataManager
+        const originalMethods = {
+            load: DataManager.load,
+            saveToCache: DataManager.saveToCache,
+            getProcesses: DataManager.getProcesses,
+            getOrders: DataManager.getOrders
+        };
+        
+        DataManager.load = async function() {
+            addLog('🔄 DataManager.load() НАЧАЛО', 'info');
+            const result = await originalMethods.load.call(this);
+            addLog(`🔄 DataManager.load() КОНЕЦ. Процессы: ${this._data.processes?.length || 'undefined'}`, 'info');
+            return result;
+        };
+        
+        DataManager.saveToCache = function() {
+            addLog(`💾 DataManager.saveToCache(). Процессы: ${this._data.processes?.length || 'undefined'}`, 'info');
+            return originalMethods.saveToCache.call(this);
+        };
+        
+        DataManager.getProcesses = function() {
+            const result = originalMethods.getProcesses.call(this);
+            addLog(`📊 DataManager.getProcesses() возвращает: ${Array.isArray(result) ? `Array(${result.length})` : typeof result}`, result === undefined ? 'error' : 'info');
+            return result;
+        };
+        
+        DataManager.getOrders = function() {
+            const result = originalMethods.getOrders.call(this);
+            addLog(`📊 DataManager.getOrders() возвращает: ${Array.isArray(result) ? `Array(${result.length})` : typeof result}`, result === undefined ? 'error' : 'info');
+            return result;
+        };
+        
+        // Перехватываем APIService
+        if (window.APIService) {
+            const originalLoadFromServer = APIService.loadFromServer;
+            APIService.loadFromServer = async function() {
+                addLog('🌐 APIService.loadFromServer() НАЧАЛО', 'info');
+                const result = await originalLoadFromServer.call(this);
+                addLog(`🌐 APIService.loadFromServer() КОНЕЦ. Результат: ${result}`, 'info');
+                return result;
+            };
+        }
+        
+        async function startDiagnostic() {
+            addLog('🚀 НАЧИНАЕМ ДИАГНОСТИКУ', 'info');
+            
+            try {
+                // Шаг 1: Проверяем начальное состояние
+                addLog('Шаг 1: Начальное состояние', 'info');
+                addLog(`Процессы: ${DataManager._data.processes?.length || 'undefined'}`, 'info');
+                addLog(`Заказы: ${DataManager._data.orders?.length || 'undefined'}`, 'info');
+                
+                // Шаг 2: Очищаем localStorage для чистого теста
+                addLog('Шаг 2: Очищаем localStorage', 'info');
+                localStorage.removeItem('crmData');
+                
+                // Шаг 3: Сбрасываем состояние DataManager
+                addLog('Шаг 3: Сбрасываем DataManager', 'info');
+                DataManager._data.processes = [];
+                DataManager._data.orders = [];
+                
+                // Шаг 4: Загружаем данные
+                addLog('Шаг 4: Вызываем DataManager.load()', 'info');
+                await DataManager.load();
+                
+                // Шаг 5: Проверяем результат
+                addLog('Шаг 5: Проверяем результат', 'info');
+                const processes = DataManager.getProcesses();
+                const orders = DataManager.getOrders();
+                
+                addLog(`Итоговые процессы: ${Array.isArray(processes) ? `Array(${processes.length})` : typeof processes}`, processes === undefined ? 'error' : 'info');
+                addLog(`Итоговые заказы: ${Array.isArray(orders) ? `Array(${orders.length})` : typeof orders}`, orders === undefined ? 'error' : 'info');
+                
+                // Шаг 6: Проверяем через 2 секунды (race condition)
+                addLog('Шаг 6: Проверяем через 2 секунды', 'info');
+                setTimeout(() => {
+                    const delayedProcesses = DataManager.getProcesses();
+                    const delayedOrders = DataManager.getOrders();
+                    
+                    addLog(`Отложенная проверка процессов: ${Array.isArray(delayedProcesses) ? `Array(${delayedProcesses.length})` : typeof delayedProcesses}`, delayedProcesses === undefined ? 'error' : 'info');
+                    addLog(`Отложенная проверка заказов: ${Array.isArray(delayedOrders) ? `Array(${delayedOrders.length})` : typeof delayedOrders}`, delayedOrders === undefined ? 'error' : 'info');
+                }, 2000);
+                
+            } catch (error) {
+                addLog(`❌ ОШИБКА ДИАГНОСТИКИ: ${error.message}`, 'error');
+                console.error('Ошибка диагностики:', error);
+            }
+        }
+        
+        // Автозапуск диагностики через 1 секунду
+        setTimeout(startDiagnostic, 1000);
+        
+    </script>
+</body>
+</html>

@@ -46,6 +46,61 @@ const DataManager = {
     // Сеттеры для данных
     setCurrentUser(user) { this._data.currentUser = user; },
 
+    // Безопасное обновление данных с сервера
+    updateFromServer(serverData) {
+        console.log('🔄 Обновляем данные с сервера...');
+        
+        try {
+            // Безопасное обновление с проверками и копированием массивов
+            if (serverData.users && Array.isArray(serverData.users)) {
+                this._data.users = [...serverData.users];
+                console.log(`✅ Пользователи обновлены: ${this._data.users.length}`);
+            } else {
+                console.warn('⚠️ Некорректные данные пользователей с сервера');
+            }
+            
+            if (serverData.processes && Array.isArray(serverData.processes)) {
+                this._data.processes = [...serverData.processes];
+                console.log(`✅ Процессы обновлены: ${this._data.processes.length}`);
+            } else {
+                console.warn('⚠️ Некорректные данные процессов с сервера');
+                this._data.processes = [];
+            }
+            
+            if (serverData.products && Array.isArray(serverData.products)) {
+                this._data.products = [...serverData.products];
+                console.log(`✅ Изделия обновлены: ${this._data.products.length}`);
+            } else {
+                console.warn('⚠️ Некорректные данные изделий с сервера');
+                this._data.products = [];
+            }
+            
+            if (serverData.orders && Array.isArray(serverData.orders)) {
+                this._data.orders = [...serverData.orders];
+                console.log(`✅ Заказы обновлены: ${this._data.orders.length}`);
+            } else {
+                console.warn('⚠️ Некорректные данные заказов с сервера');
+                this._data.orders = [];
+            }
+            
+            // Проверяем админа
+            this.ensureAdminExists();
+            
+            // Валидируем данные
+            this.validateData();
+            
+            // Сохраняем в кэш
+            this.saveToCache();
+            
+            console.log('✅ Данные успешно обновлены с сервера');
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Ошибка обновления данных с сервера:', error);
+            return false;
+        }
+    },
+
     // Добавление сущностей (с отправкой на сервер)
     async addUser(user) { 
         this._data.users.push(user);
@@ -245,7 +300,7 @@ const DataManager = {
             };
             
             localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.CRM_DATA, JSON.stringify(dataToSave));
-            console.log('Данные сохранены в кэш (localStorage)');
+            console.log('💾 Данные сохранены в кэш (localStorage)');
         } catch (error) {
             console.error('Ошибка сохранения в кэш:', error);
         }
@@ -265,42 +320,19 @@ const DataManager = {
         console.log('📅 Начинаем загрузку данных...');
         
         try {
-            // Сначала пытаемся загрузить с сервера
+            // Сначала пытаемся загрузить с сервера через безопасный метод
             if (window.APIService) {
                 console.log('🌐 Проверяем доступность сервера...');
                 const serverLoaded = await window.APIService.loadFromServer();
                 if (serverLoaded) {
                     console.log('✅ Данные успешно загружены с сервера');
-                    
-                    // Проверяем что данные действительно загрузились
-                    this.validateData();
                     return;
                 }
             }
             
             // Если сервер недоступен, загружаем из кэша
             console.log('📂 Сервер недоступен, загружаем из кэша...');
-            
-            const savedData = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.CRM_DATA);
-            if (savedData) {
-                try {
-                    const parsed = JSON.parse(savedData);
-                    
-                    // Проверяем и загружаем данные
-                    this._data.users = Array.isArray(parsed.users) ? parsed.users : [APP_CONSTANTS.DEFAULTS.ADMIN_USER];
-                    this._data.processes = Array.isArray(parsed.processes) ? parsed.processes : [];
-                    this._data.products = Array.isArray(parsed.products) ? parsed.products : [];
-                    this._data.orders = Array.isArray(parsed.orders) ? parsed.orders : [];
-                    
-                    console.log('✅ Данные загружены из кэша');
-                } catch (parseError) {
-                    console.error('❌ Ошибка парсинга данных из кэша:', parseError);
-                    this.initializeDefaultData();
-                }
-            } else {
-                console.log('📋 Кэш пуст, используются данные по умолчанию');
-                this.initializeDefaultData();
-            }
+            this.loadFromCache();
             
             // Проверяем и восстанавливаем админа если его нет
             this.ensureAdminExists();
@@ -325,6 +357,30 @@ const DataManager = {
             изделия: this._data.products.length,
             заказы: this._data.orders.length
         });
+    },
+
+    // Загрузка из кэша
+    loadFromCache() {
+        const savedData = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.CRM_DATA);
+        if (savedData) {
+            try {
+                const parsed = JSON.parse(savedData);
+                
+                // Проверяем и загружаем данные
+                this._data.users = Array.isArray(parsed.users) ? parsed.users : [APP_CONSTANTS.DEFAULTS.ADMIN_USER];
+                this._data.processes = Array.isArray(parsed.processes) ? parsed.processes : [];
+                this._data.products = Array.isArray(parsed.products) ? parsed.products : [];
+                this._data.orders = Array.isArray(parsed.orders) ? parsed.orders : [];
+                
+                console.log('✅ Данные загружены из кэша');
+            } catch (parseError) {
+                console.error('❌ Ошибка парсинга данных из кэша:', parseError);
+                this.initializeDefaultData();
+            }
+        } else {
+            console.log('📋 Кэш пуст, используются данные по умолчанию');
+            this.initializeDefaultData();
+        }
     },
     
     // Инициализация данных по умолчанию

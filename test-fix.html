@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест исправления undefined</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .warning { background: #fff3cd; color: #856404; }
+        button { padding: 8px 16px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-success { background: #28a745; color: white; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Тест исправления проблемы с undefined данными</h1>
+    <p>Этот тест проверяет, что процессы больше не становятся undefined после загрузки.</p>
+    
+    <div>
+        <button class="btn-primary" onclick="runTest()">🧪 Запустить тест</button>
+        <button class="btn-secondary" onclick="clearCache()">🗑️ Очистить кэш</button>
+        <button class="btn-success" onclick="createTestDataAndTest()">📊 Создать данные и тестировать</button>
+        <button class="btn-secondary" onclick="clearResults()">📝 Очистить лог</button>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script src="js/utils/constants.js"></script>
+    <script src="js/services/APIService.js"></script>
+    <script src="js/modules/dataManager.js"></script>
+    
+    <script>
+        const results = document.getElementById('results');
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+            console.log(`[${type}] ${message}`);
+        }
+        
+        function clearResults() {
+            results.innerHTML = '';
+        }
+        
+        function clearCache() {
+            localStorage.removeItem('crmData');
+            sessionStorage.clear();
+            addResult('🗑️ Кэш очищен', 'warning');
+        }
+        
+        async function createTestDataAndTest() {
+            addResult('📊 Создаем тестовые данные...', 'info');
+            
+            try {
+                await DataManager.createTestData();
+                addResult('✅ Тестовые данные созданы', 'success');
+                
+                // Запускаем тест
+                await runTest();
+            } catch (error) {
+                addResult(`❌ Ошибка создания тестовых данных: ${error.message}`, 'error');
+            }
+        }
+        
+        async function runTest() {
+            addResult('🚀 НАЧИНАЕМ ТЕСТ ИСПРАВЛЕНИЯ', 'info');
+            
+            try {
+                // Тест 1: Проверка геттеров
+                addResult('Тест 1: Проверяем защищенные геттеры', 'info');
+                
+                const users = DataManager.getUsers();
+                const processes = DataManager.getProcesses();
+                const products = DataManager.getProducts();
+                const orders = DataManager.getOrders();
+                
+                if (Array.isArray(users)) {
+                    addResult(`✅ getUsers() возвращает массив (${users.length} элементов)`, 'success');
+                } else {
+                    addResult(`❌ getUsers() возвращает ${typeof users}`, 'error');
+                }
+                
+                if (Array.isArray(processes)) {
+                    addResult(`✅ getProcesses() возвращает массив (${processes.length} элементов)`, 'success');
+                } else {
+                    addResult(`❌ getProcesses() возвращает ${typeof processes}`, 'error');
+                }
+                
+                if (Array.isArray(products)) {
+                    addResult(`✅ getProducts() возвращает массив (${products.length} элементов)`, 'success');
+                } else {
+                    addResult(`❌ getProducts() возвращает ${typeof products}`, 'error');
+                }
+                
+                if (Array.isArray(orders)) {
+                    addResult(`✅ getOrders() возвращает массив (${orders.length} элементов)`, 'success');
+                } else {
+                    addResult(`❌ getOrders() возвращает ${typeof orders}`, 'error');
+                }
+                
+                // Тест 2: Симуляция обновления страницы
+                addResult('Тест 2: Симуляция обновления страницы', 'info');
+                
+                // Сохраняем текущее состояние
+                const currentProcesses = DataManager.getProcesses().length;
+                const currentOrders = DataManager.getOrders().length;
+                
+                addResult(`Текущее состояние: ${currentProcesses} процессов, ${currentOrders} заказов`, 'info');
+                
+                // Сбрасываем состояние (имитируем перезагрузку)
+                DataManager._data = {
+                    users: [APP_CONSTANTS.DEFAULTS.ADMIN_USER],
+                    processes: undefined, // Намеренно ставим undefined
+                    products: undefined,
+                    orders: undefined,
+                    currentUser: null
+                };
+                
+                addResult('⚠️ Данные намеренно повреждены (установлены в undefined)', 'warning');
+                
+                // Проверяем что геттеры защищают от undefined
+                const protectedProcesses = DataManager.getProcesses();
+                const protectedOrders = DataManager.getOrders();
+                
+                if (Array.isArray(protectedProcesses)) {
+                    addResult('✅ getProcesses() защищает от undefined', 'success');
+                } else {
+                    addResult('❌ getProcesses() не защищает от undefined!', 'error');
+                }
+                
+                if (Array.isArray(protectedOrders)) {
+                    addResult('✅ getOrders() защищает от undefined', 'success');
+                } else {
+                    addResult('❌ getOrders() не защищает от undefined!', 'error');
+                }
+                
+                // Тест 3: Полная перезагрузка данных
+                addResult('Тест 3: Полная перезагрузка данных', 'info');
+                
+                await DataManager.load();
+                
+                const reloadedProcesses = DataManager.getProcesses();
+                const reloadedOrders = DataManager.getOrders();
+                
+                if (Array.isArray(reloadedProcesses)) {
+                    addResult(`✅ После load() процессы: массив (${reloadedProcesses.length} элементов)`, 'success');
+                } else {
+                    addResult(`❌ После load() процессы: ${typeof reloadedProcesses}`, 'error');
+                }
+                
+                if (Array.isArray(reloadedOrders)) {
+                    addResult(`✅ После load() заказы: массив (${reloadedOrders.length} элементов)`, 'success');
+                } else {
+                    addResult(`❌ После load() заказы: ${typeof reloadedOrders}`, 'error');
+                }
+                
+                // Тест 4: Множественные вызовы геттеров
+                addResult('Тест 4: Множественные вызовы геттеров', 'info');
+                
+                for (let i = 0; i < 5; i++) {
+                    const testProcesses = DataManager.getProcesses();
+                    const testOrders = DataManager.getOrders();
+                    
+                    if (!Array.isArray(testProcesses) || !Array.isArray(testOrders)) {
+                        addResult(`❌ Вызов ${i + 1}: данные повреждены`, 'error');
+                        break;
+                    }
+                    
+                    if (i === 4) {
+                        addResult('✅ Все 5 вызовов геттеров успешны', 'success');
+                    }
+                }
+                
+                // Тест 5: Безопасное обновление с сервера
+                addResult('Тест 5: Тест безопасного обновления с сервера', 'info');
+                
+                const testServerData = {
+                    users: [
+                        { id: 1, name: 'Тестовый админ', isAdmin: true },
+                        { id: 2, name: 'Тестовый пользователь', isAdmin: false }
+                    ],
+                    processes: [
+                        { id: 1, name: 'Тестовый процесс 1', order: 1 },
+                        { id: 2, name: 'Тестовый процесс 2', order: 2 }
+                    ],
+                    products: [
+                        { id: 1, name: 'Тестовое изделие', processes: [1, 2] }
+                    ],
+                    orders: [
+                        { id: 1, number: 'TEST-001', customerName: 'Тестовый клиент' }
+                    ]
+                };
+                
+                const updateSuccess = DataManager.updateFromServer(testServerData);
+                
+                if (updateSuccess) {
+                    addResult('✅ Безопасное обновление с сервера успешно', 'success');
+                    
+                    const updatedProcesses = DataManager.getProcesses();
+                    const updatedOrders = DataManager.getOrders();
+                    
+                    addResult(`✅ После обновления: ${updatedProcesses.length} процессов, ${updatedOrders.length} заказов`, 'success');
+                } else {
+                    addResult('❌ Ошибка безопасного обновления с сервера', 'error');
+                }
+                
+                addResult('🎉 ВСЕ ТЕСТЫ ЗАВЕРШЕНЫ!', 'success');
+                
+                // Финальная проверка
+                setTimeout(() => {
+                    const finalProcesses = DataManager.getProcesses();
+                    const finalOrders = DataManager.getOrders();
+                    
+                    if (Array.isArray(finalProcesses) && Array.isArray(finalOrders)) {
+                        addResult('🏆 ФИНАЛЬНАЯ ПРОВЕРКА: Данные остаются корректными!', 'success');
+                    } else {
+                        addResult('💥 ФИНАЛЬНАЯ ПРОВЕРКА: Данные повредились!', 'error');
+                    }
+                }, 1000);
+                
+            } catch (error) {
+                addResult(`❌ Критическая ошибка теста: ${error.message}`, 'error');
+                console.error('Ошибка теста:', error);
+            }
+        }
+        
+        // Автозапуск через 1 секунду
+        setTimeout(() => {
+            addResult('🎯 Система готова к тестированию', 'info');
+            addResult('💡 Нажмите "Запустить тест" для проверки исправления', 'info');
+        }, 1000);
+        
+    </script>
+</body>
+</html>

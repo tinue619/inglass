@@ -98,33 +98,23 @@ class APIService {
                 if (result.success && result.data) {
                     const serverData = result.data;
                     
-                    // Обновляем DataManager данными с сервера
-                    DataManager._data.users = serverData.users || [APP_CONSTANTS.DEFAULTS.ADMIN_USER];
-                    DataManager._data.processes = serverData.processes || [];
-                    DataManager._data.products = serverData.products || [];
-                    DataManager._data.orders = serverData.orders || [];
+                    // Используем безопасный метод DataManager для обновления
+                    const success = DataManager.updateFromServer(serverData);
                     
-                    // Проверяем админа
-                    const admin = DataManager._data.users.find(u => u.isAdmin);
-                    if (!admin) {
-                        DataManager._data.users.unshift(APP_CONSTANTS.DEFAULTS.ADMIN_USER);
+                    if (success) {
+                        console.log('✅ Данные загружены с сервера');
+                        console.log(`👥 Пользователей: ${DataManager.getUsers().length}`);
+                        console.log(`⚙️ Процессов: ${DataManager.getProcesses().length}`);
+                        console.log(`📦 Изделий: ${DataManager.getProducts().length}`);
+                        console.log(`📋 Заказов: ${DataManager.getOrders().length}`);
+                        
+                        // Обновляем UI если нужно
+                        if (window.BoardModule && typeof BoardModule.renderBoard === 'function') {
+                            BoardModule.renderBoard();
+                        }
+                        
+                        return true;
                     }
-                    
-                    // Сохраняем в localStorage как кэш
-                    DataManager.saveToCache();
-                    
-                    console.log('✅ Данные загружены с сервера');
-                    console.log(`👥 Пользователей: ${DataManager._data.users.length}`);
-                    console.log(`⚙️ Процессов: ${DataManager._data.processes.length}`);
-                    console.log(`📦 Изделий: ${DataManager._data.products.length}`);
-                    console.log(`📋 Заказов: ${DataManager._data.orders.length}`);
-                    
-                    // Обновляем UI если нужно
-                    if (window.BoardModule && typeof BoardModule.renderBoard === 'function') {
-                        BoardModule.renderBoard();
-                    }
-                    
-                    return true;
                 }
             }
         } catch (error) {
@@ -146,10 +136,10 @@ class APIService {
             console.log('📤 Отправляем данные на сервер...');
             
             const localData = {
-                users: DataManager._data.users,
-                processes: DataManager._data.processes,
-                products: DataManager._data.products,
-                orders: DataManager._data.orders
+                users: DataManager.getUsers(),
+                processes: DataManager.getProcesses(),
+                products: DataManager.getProducts(),
+                orders: DataManager.getOrders()
             };
             
             const response = await fetch(`${this.baseUrl}/data`, {

@@ -34,7 +34,7 @@ const AppModule = {
                             Админ панель
                             </button>` : ''
                         }
-                            <button class="btn btn-secondary btn-small" onclick="BoardModule.showProcessBoard()">
+                            <button class="btn btn-secondary btn-small" onclick="AppModule.showProcessBoard()">
                                 Процессы
                             </button>
                             <button class="btn btn-danger btn-small" onclick="AuthModule.logout()">
@@ -60,12 +60,12 @@ const AppModule = {
                     console.log(`Данные для UI: процессов=${processes.length}, заказов=${orders.length}`);
                     
                     if (processes !== undefined && orders !== undefined) {
-                        BoardModule.showProcessBoard();
+                        this.showProcessBoard();
                     } else {
                         console.warn('Данные ещё не загружены, ждём...');
                         // Пробуем ещё раз через секунду
                         setTimeout(() => {
-                            BoardModule.showProcessBoard();
+                            this.showProcessBoard();
                         }, 1000);
                     }
                 } catch (error) {
@@ -74,7 +74,7 @@ const AppModule = {
                         <div style="padding: 20px;">
                             <h3>Ошибка загрузки доски процессов</h3>
                             <p>${error.message}</p>
-                            <button onclick="BoardModule.showProcessBoard()">Попробовать снова</button>
+                            <button onclick="AppModule.showProcessBoard()">Попробовать снова</button>
                         </div>
                     `;
                 }
@@ -89,6 +89,23 @@ const AppModule = {
                     <button onclick="AuthModule.logout()">Выйти</button>
                 </div>
             `;
+        }
+    },
+
+    // Метод для показа доски процессов (через AppModule)
+    showProcessBoard() {
+        console.log('📋 Показываем доску процессов через AppModule');
+        
+        if (typeof BoardModule !== 'undefined' && BoardModule.showProcessBoard) {
+            try {
+                BoardModule.showProcessBoard();
+            } catch (error) {
+                console.error('❌ Ошибка показа доски:', error);
+                alert('Ошибка показа доски процессов: ' + error.message);
+            }
+        } else {
+            console.error('❌ BoardModule не загружен!');
+            alert('Модуль доски не загружен. Перезагрузите страницу.');
         }
     },
 

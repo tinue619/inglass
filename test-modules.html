@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест загрузки модулей - Inglass CRM</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { padding: 10px; margin: 5px 0; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .btn { padding: 10px 15px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Тест загрузки модулей Inglass CRM</h1>
+    
+    <div id="results"></div>
+    
+    <button class="btn btn-primary" onclick="testModules()">🔍 Проверить модули</button>
+    <button class="btn btn-primary" onclick="testBoardModule()">📋 Тест BoardModule</button>
+    
+    <!-- Подключаем модули в том же порядке что и в index.html -->
+    <script src="js/utils/constants.js"></script>
+    <script src="js/utils/phoneUtils.js"></script>
+    <script src="js/utils/contactEntities.js"></script>
+    <script src="js/utils/orderUtils.js"></script>
+    <script src="js/services/APIService.js"></script>
+    <script src="js/modules/dataManager.js"></script>
+    <script src="js/modules/modalModule.js"></script>
+    <script src="js/modules/authModule.js"></script>
+    <script src="js/modules/boardModule.js"></script>
+    <script src="js/modules/defectModule.js"></script>
+    <script src="js/modules/adminModule.js"></script>
+    <script src="js/modules/appModule.js"></script>
+
+    <script>
+        function addResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.textContent = message;
+            results.appendChild(div);
+            console.log(`[${type}] ${message}`);
+        }
+        
+        function testModules() {
+            document.getElementById('results').innerHTML = '';
+            addResult('🔍 Начинаем проверку модулей...', 'info');
+            
+            const modules = [
+                { name: 'APP_CONSTANTS', obj: window.APP_CONSTANTS },
+                { name: 'PhoneUtils', obj: window.PhoneUtils },
+                { name: 'Phone', obj: window.Phone },
+                { name: 'OrderUtils', obj: window.OrderUtils },
+                { name: 'APIService', obj: window.APIService },
+                { name: 'DataManager', obj: window.DataManager },
+                { name: 'ModalModule', obj: window.ModalModule },
+                { name: 'AuthModule', obj: window.AuthModule },
+                { name: 'BoardModule', obj: window.BoardModule },
+                { name: 'DefectModule', obj: window.DefectModule },
+                { name: 'AdminModule', obj: window.AdminModule },
+                { name: 'AppModule', obj: window.AppModule }
+            ];
+            
+            modules.forEach(module => {
+                if (module.obj) {
+                    addResult(`✅ ${module.name} загружен`, 'success');
+                    
+                    // Проверяем основные методы
+                    if (module.name === 'BoardModule' && module.obj.showProcessBoard) {
+                        addResult(`  ✅ BoardModule.showProcessBoard() доступен`, 'success');
+                    }
+                    if (module.name === 'DataManager' && module.obj.load) {
+                        addResult(`  ✅ DataManager.load() доступен`, 'success');
+                    }
+                } else {
+                    addResult(`❌ ${module.name} НЕ загружен!`, 'error');
+                }
+            });
+            
+            addResult('🏁 Проверка завершена', 'info');
+        }
+        
+        async function testBoardModule() {
+            addResult('📋 Тестирование BoardModule...', 'info');
+            
+            if (!window.BoardModule) {
+                addResult('❌ BoardModule не найден!', 'error');
+                return;
+            }
+            
+            try {
+                // Инициализируем DataManager
+                await DataManager.load();
+                addResult('✅ DataManager инициализирован', 'success');
+                
+                // Устанавливаем админа как текущего пользователя
+                const admin = DataManager.getUsers().find(u => u.isAdmin);
+                if (admin) {
+                    DataManager.setCurrentUser(admin);
+                    addResult('✅ Администратор установлен как текущий пользователь', 'success');
+                } else {
+                    addResult('❌ Администратор не найден', 'error');
+                    return;
+                }
+                
+                // Создаем тестовый контейнер
+                const testContainer = document.createElement('div');
+                testContainer.id = 'mainContent';
+                testContainer.style.cssText = 'width: 100%; height: 300px; border: 1px solid #ccc; margin: 10px 0; display: none;';
+                document.body.appendChild(testContainer);
+                
+                // Тестируем showProcessBoard
+                BoardModule.showProcessBoard();
+                addResult('✅ BoardModule.showProcessBoard() выполнен без ошибок', 'success');
+                
+                // Проверяем что контент создался
+                if (testContainer.innerHTML.trim()) {
+                    addResult('✅ Контент доски создан', 'success');
+                } else {
+                    addResult('⚠️ Контент доски пуст (возможно нет данных)', 'info');
+                }
+                
+            } catch (error) {
+                addResult(`❌ Ошибка при тестировании BoardModule: ${error.message}`, 'error');
+                console.error('Полная ошибка:', error);
+            }
+        }
+        
+        // Автоматический тест при загрузке
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                addResult('🚀 Страница загружена, модули должны быть доступны', 'info');
+                testModules();
+            }, 100);
+        });
+    </script>
+</body>
+</html>

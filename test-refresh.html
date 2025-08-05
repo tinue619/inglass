@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест обновления страницы</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .warning { background: #fff3cd; color: #856404; }
+        button { padding: 8px 16px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .data-info { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <h1>🔄 Тест обновления страницы и загрузки данных</h1>
+    
+    <div class="data-info">
+        <h3>Информация о загрузке:</h3>
+        <div id="loadingInfo">Ожидание...</div>
+    </div>
+    
+    <div id="results"></div>
+    
+    <div style="margin: 20px 0;">
+        <button class="btn-primary" onclick="testDataLoading()">🔍 Проверить загрузку данных</button>
+        <button class="btn-secondary" onclick="createTestData()">📊 Создать тестовые данные</button>
+        <button class="btn-secondary" onclick="simulateRefresh()">🔄 Симулировать обновление</button>
+        <button class="btn-danger" onclick="clearAllData()">🗑️ Очистить все данные</button>
+        <button class="btn-secondary" onclick="clearResults()">📝 Очистить лог</button>
+    </div>
+    
+    <script src="js/utils/constants.js"></script>
+    <script src="js/services/APIService.js"></script>
+    <script src="js/modules/dataManager.js"></script>
+    <script>
+        const results = document.getElementById('results');
+        const loadingInfo = document.getElementById('loadingInfo');
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+        
+        function updateLoadingInfo() {
+            const processes = DataManager.getProcesses();
+            const orders = DataManager.getOrders();
+            const products = DataManager.getProducts();
+            const users = DataManager.getUsers();
+            
+            loadingInfo.innerHTML = `
+                <strong>Текущее состояние данных:</strong><br>
+                👥 Пользователи: ${users ? users.length : 'undefined'}<br>
+                ⚙️ Процессы: ${processes ? processes.length : 'undefined'}<br>
+                📦 Изделия: ${products ? products.length : 'undefined'}<br>
+                📋 Заказы: ${orders ? orders.length : 'undefined'}<br>
+                🌐 Сервер: ${APIService.isOnline ? '🟢 Онлайн' : '🔴 Офлайн'}<br>
+                💾 localStorage: ${localStorage.getItem('crmData') ? '✅ Есть данные' : '❌ Пусто'}
+            `;
+        }
+        
+        function clearResults() {
+            results.innerHTML = '';
+        }
+        
+        async function testDataLoading() {
+            addResult('🔧 Тестируем загрузку данных...', 'info');
+            
+            try {
+                // Проверяем начальное состояние
+                updateLoadingInfo();
+                addResult('📊 Начальное состояние данных зафиксировано', 'info');
+                
+                // Загружаем данные
+                await DataManager.load();
+                addResult('✅ DataManager.load() выполнен', 'success');
+                
+                // Проверяем что загрузилось
+                const processes = DataManager.getProcesses();
+                const orders = DataManager.getOrders();
+                const products = DataManager.getProducts();
+                const users = DataManager.getUsers();
+                
+                updateLoadingInfo();
+                
+                if (processes && orders && products && users) {
+                    addResult('✅ Все типы данных загружены успешно', 'success');
+                    addResult(`👥 Пользователей: ${users.length}`, 'info');
+                    addResult(`⚙️ Процессов: ${processes.length}`, 'info');
+                    addResult(`📦 Изделий: ${products.length}`, 'info');
+                    addResult(`📋 Заказов: ${orders.length}`, 'info');
+                } else {
+                    addResult('❌ Некоторые данные не загрузились!', 'error');
+                    addResult(`Процессы: ${!!processes}, Заказы: ${!!orders}, Изделия: ${!!products}, Пользователи: ${!!users}`, 'error');
+                }
+                
+            } catch (error) {
+                addResult(`❌ Ошибка загрузки: ${error.message}`, 'error');
+            }
+        }
+        
+        async function createTestData() {
+            addResult('📦 Создаем тестовые данные...', 'info');
+            
+            try {
+                await DataManager.createTestData();
+                addResult('✅ Тестовые данные созданы', 'success');
+                updateLoadingInfo();
+            } catch (error) {
+                addResult(`❌ Ошибка создания тестовых данных: ${error.message}`, 'error');
+            }
+        }
+        
+        async function simulateRefresh() {
+            addResult('🔄 Симулируем обновление страницы...', 'warning');
+            
+            try {
+                // Очищаем данные в памяти (симулируем перезагрузку)
+                DataManager._data = {
+                    users: [APP_CONSTANTS.DEFAULTS.ADMIN_USER],
+                    processes: [],
+                    products: [],
+                    orders: [],
+                    currentUser: null
+                };
+                
+                updateLoadingInfo();
+                addResult('🗑️ Данные в памяти очищены (симуляция перезагрузки)', 'warning');
+                
+                // Загружаем заново
+                await DataManager.load();
+                addResult('📥 Данные перезагружены', 'info');
+                
+                updateLoadingInfo();
+                
+                // Проверяем результат
+                const processes = DataManager.getProcesses();
+                const orders = DataManager.getOrders();
+                
+                if (processes && orders && processes.length > 0) {
+                    addResult('✅ Данные успешно восстановлены после "обновления"', 'success');
+                } else {
+                    addResult('❌ Данные не восстановились после "обновления"!', 'error');
+                }
+                
+            } catch (error) {
+                addResult(`❌ Ошибка симуляции: ${error.message}`, 'error');
+            }
+        }
+        
+        async function clearAllData() {
+            if (!confirm('Удалить ВСЕ данные? Это действие нельзя отменить!')) {
+                return;
+            }
+            
+            addResult('🗑️ Очищаем все данные...', 'warning');
+            
+            try {
+                await DataManager.clearAll();
+                localStorage.removeItem('crmData');
+                addResult('✅ Все данные очищены', 'warning');
+                updateLoadingInfo();
+            } catch (error) {
+                addResult(`❌ Ошибка очистки: ${error.message}`, 'error');
+            }
+        }
+        
+        // Автоматическое обновление информации каждые 2 секунды
+        setInterval(updateLoadingInfo, 2000);
+        
+        // Инициализация при загрузке
+        document.addEventListener('DOMContentLoaded', async () => {
+            addResult('🚀 Тест системы загружен', 'info');
+            
+            // Показываем начальное состояние
+            updateLoadingInfo();
+            
+            // Автоматически тестируем загрузку
+            setTimeout(async () => {
+                await testDataLoading();
+            }, 1000);
+        });
+        
+        // Тест при обновлении страницы
+        window.addEventListener('beforeunload', () => {
+            console.log('💾 Страница обновляется, данные должны сохраниться в localStorage');
+        });
+    </script>
+</body>
+</html>

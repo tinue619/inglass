@@ -8,11 +8,39 @@ const DataManager = {
         currentUser: null
     },
 
-    // Геттеры для данных
-    getUsers() { return this._data.users; },
-    getProcesses() { return this._data.processes; },
-    getProducts() { return this._data.products; },
-    getOrders() { return this._data.orders; },
+    // Геттеры для данных (с защитой от undefined)
+    getUsers() { 
+        if (!this._data.users || !Array.isArray(this._data.users)) {
+            console.warn('Пользователи не загружены, возвращаем данные по умолчанию');
+            this._data.users = [APP_CONSTANTS.DEFAULTS.ADMIN_USER];
+        }
+        return this._data.users;
+    },
+    
+    getProcesses() { 
+        if (!this._data.processes || !Array.isArray(this._data.processes)) {
+            console.warn('Процессы не загружены, возвращаем пустой массив');
+            this._data.processes = [];
+        }
+        return this._data.processes;
+    },
+    
+    getProducts() { 
+        if (!this._data.products || !Array.isArray(this._data.products)) {
+            console.warn('Изделия не загружены, возвращаем пустой массив');
+            this._data.products = [];
+        }
+        return this._data.products;
+    },
+    
+    getOrders() { 
+        if (!this._data.orders || !Array.isArray(this._data.orders)) {
+            console.warn('Заказы не загружены, возвращаем пустой массив');
+            this._data.orders = [];
+        }
+        return this._data.orders;
+    },
+    
     getCurrentUser() { return this._data.currentUser; },
 
     // Сеттеры для данных
@@ -234,47 +262,122 @@ const DataManager = {
 
     // Загрузка данных (сначала с сервера, потом из кэша)
     async load() {
+        console.log('📅 Начинаем загрузку данных...');
+        
         try {
-            console.log('📥 Загружаем данные...');
-            
             // Сначала пытаемся загрузить с сервера
             if (window.APIService) {
+                console.log('🌐 Проверяем доступность сервера...');
                 const serverLoaded = await window.APIService.loadFromServer();
                 if (serverLoaded) {
-                    console.log('✅ Данные загружены с сервера');
+                    console.log('✅ Данные успешно загружены с сервера');
+                    
+                    // Проверяем что данные действительно загрузились
+                    this.validateData();
                     return;
                 }
             }
             
             // Если сервер недоступен, загружаем из кэша
             console.log('📂 Сервер недоступен, загружаем из кэша...');
+            
             const savedData = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.CRM_DATA);
             if (savedData) {
-                const parsed = JSON.parse(savedData);
-                this._data.users = parsed.users || [APP_CONSTANTS.DEFAULTS.ADMIN_USER];
-                this._data.processes = parsed.processes || [];
-                this._data.products = parsed.products || [];
-                this._data.orders = parsed.orders || [];
-                
-                console.log('✅ Данные загружены из кэша');
+                try {
+                    const parsed = JSON.parse(savedData);
+                    
+                    // Проверяем и загружаем данные
+                    this._data.users = Array.isArray(parsed.users) ? parsed.users : [APP_CONSTANTS.DEFAULTS.ADMIN_USER];
+                    this._data.processes = Array.isArray(parsed.processes) ? parsed.processes : [];
+                    this._data.products = Array.isArray(parsed.products) ? parsed.products : [];
+                    this._data.orders = Array.isArray(parsed.orders) ? parsed.orders : [];
+                    
+                    console.log('✅ Данные загружены из кэша');
+                } catch (parseError) {
+                    console.error('❌ Ошибка парсинга данных из кэша:', parseError);
+                    this.initializeDefaultData();
+                }
             } else {
-                console.log('📋 Используются данные по умолчанию');
+                console.log('📋 Кэш пуст, используются данные по умолчанию');
+                this.initializeDefaultData();
             }
             
             // Проверяем и восстанавливаем админа если его нет
-            const admin = this._data.users.find(u => u.isAdmin);
-            if (!admin) {
-                console.log('👤 Админ не найден, создаем заново');
-                this._data.users.unshift(APP_CONSTANTS.DEFAULTS.ADMIN_USER);
-            }
+            this.ensureAdminExists();
+            
+            // Валидируем загруженные данные
+            this.validateData();
             
             // Сохраняем в кэш
             this.saveToCache();
             
         } catch (error) {
-            console.error('Ошибка загрузки данных:', error);
-            console.log('📋 Используются данные по умолчанию');
+            console.error('❌ Критическая ошибка загрузки данных:', error);
+            console.log('📋 Инициализируем данные по умолчанию из-за ошибки');
+            this.initializeDefaultData();
+            this.ensureAdminExists();
             this.saveToCache();
+        }
+        
+        console.log('📊 Загрузка завершена. Статистика:', {
+            пользователи: this._data.users.length,
+            процессы: this._data.processes.length,
+            изделия: this._data.products.length,
+            заказы: this._data.orders.length
+        });
+    },
+    
+    // Инициализация данных по умолчанию
+    initializeDefaultData() {
+        this._data.users = [APP_CONSTANTS.DEFAULTS.ADMIN_USER];
+        this._data.processes = [];
+        this._data.products = [];
+        this._data.orders = [];
+        console.log('🔧 Данные инициализированы значениями по умолчанию');
+    },
+    
+    // Проверка наличия администратора
+    ensureAdminExists() {
+        const admin = this._data.users.find(u => u.isAdmin);
+        if (!admin) {
+            console.log('👤 Админ не найден, создаем заново');
+            this._data.users.unshift(APP_CONSTANTS.DEFAULTS.ADMIN_USER);
+        }
+    },
+    
+    // Валидация данных
+    validateData() {
+        let hasErrors = false;
+        
+        if (!Array.isArray(this._data.users)) {
+            console.warn('⚠️ Пользователи не являются массивом, исправляем...');
+            this._data.users = [APP_CONSTANTS.DEFAULTS.ADMIN_USER];
+            hasErrors = true;
+        }
+        
+        if (!Array.isArray(this._data.processes)) {
+            console.warn('⚠️ Процессы не являются массивом, исправляем...');
+            this._data.processes = [];
+            hasErrors = true;
+        }
+        
+        if (!Array.isArray(this._data.products)) {
+            console.warn('⚠️ Изделия не являются массивом, исправляем...');
+            this._data.products = [];
+            hasErrors = true;
+        }
+        
+        if (!Array.isArray(this._data.orders)) {
+            console.warn('⚠️ Заказы не являются массивом, исправляем...');
+            this._data.orders = [];
+            hasErrors = true;
+        }
+        
+        if (hasErrors) {
+            console.log('🔧 Данные исправлены после валидации');
+            this.saveToCache();
+        } else {
+            console.log('✅ Все данные прошли валидацию');
         }
     },
 

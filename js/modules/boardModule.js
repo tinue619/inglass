@@ -16,7 +16,39 @@ const BoardModule = {
             return;
         }
 
+        // Проверяем что данные загружены
+        const orders = DataManager.getOrders();
+        const processes = DataManager.getProcesses();
+        
+        if (!orders || !processes) {
+            console.warn('Данные ещё не загружены, показываем индикатор загрузки');
+            mainContent.innerHTML = `
+                <div class="board-container">
+                    <div class="process-board" style="padding: 40px; text-align: center;">
+                        <div style="font-size: 24px; margin-bottom: 10px;">🔄</div>
+                        <div>Загрузка данных...</div>
+                        <div style="margin-top: 10px; font-size: 12px; color: #666;">
+                            Ожидание синхронизации с сервером...
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Пробуем перезагрузить данные через 2 секунды
+            setTimeout(async () => {
+                try {
+                    await DataManager.load();
+                    this.showProcessBoard(); // Повторный вызов
+                } catch (error) {
+                    console.error('Ошибка перезагрузки данных:', error);
+                }
+            }, 2000);
+            return;
+        }
+
         const canCreate = user.isAdmin || user.canCreateOrders;
+        
+        console.log(`Отрисовываем доску: процессов=${processes.length}, заказов=${orders.length}`);
         
         mainContent.innerHTML = `
             <div class="board-container">
@@ -24,22 +56,20 @@ const BoardModule = {
                     <div class="board-header">
                         <button class="btn btn-primary" onclick="BoardModule.showAddOrderModal()">Добавить заказ</button>
                         <div class="board-stats">
-                            <span>Всего заказов: ${DataManager.getOrders().length}</span>
-                            <span>В работе: ${DataManager.getOrders().filter(o => o.currentProcessId).length}</span>
-                            <span>Завершено: ${DataManager.getOrders().filter(o => !o.currentProcessId).length}</span>
+                            <span>Всего заказов: ${orders.length}</span>
+                            <span>В работе: ${orders.filter(o => o.currentProcessId).length}</span>
+                            <span>Завершено: ${orders.filter(o => !o.currentProcessId).length}</span>
                         </div>
                     </div>
                 ` : ''}
                 <div class="process-board" id="processBoard">
-                    <div style="padding: 20px;">Загрузка процессов...</div>
+                    <div style="padding: 20px;">Отрисовка процессов...</div>
                 </div>
             </div>
         `;
         
-        // Рендерим доску процессов с задержкой
-        setTimeout(() => {
-            this.renderProcessBoard();
-        }, 100);
+        // Отрисовываем доску процессов немедленно
+        this.renderProcessBoard();
         
         // Добавляем глобальное делегирование событий только один раз
         if (!this._clickHandlerAdded) {
@@ -161,14 +191,40 @@ const BoardModule = {
             return;
         }
         
+        // Проверяем что данные загружены
+        const processes = DataManager.getProcesses();
+        const orders = DataManager.getOrders();
+        const products = DataManager.getProducts();
+        
+        if (!processes || !orders || !products) {
+            console.warn('Данные для рендеринга не готовы:', { processes: !!processes, orders: !!orders, products: !!products });
+            processBoard.innerHTML = `
+                <div style="padding: 40px; text-align: center; color: #666;">
+                    <div style="font-size: 24px; margin-bottom: 10px;">🔄</div>
+                    <div>Загрузка процессов...</div>
+                    <div style="font-size: 12px; color: #999; margin-top: 10px;">
+                        Процессы: ${!!processes}, Заказы: ${!!orders}, Изделия: ${!!products}
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
         const user = DataManager.getCurrentUser();
+        if (!user) {
+            console.error('Текущий пользователь не найден');
+            return;
+        }
+        
         const isAdmin = user.isAdmin;
+        
+        console.log(`Рендерим: процессов=${processes.length}, заказов=${orders.length}, изделий=${products.length}`);
         
         try {
             // Получаем процессы, доступные пользователю
             const availableProcesses = isAdmin 
-                ? DataManager.getProcesses() 
-                : DataManager.getProcesses().filter(p => user.processes.includes(p.id));
+                ? processes 
+                : processes.filter(p => user.processes.includes(p.id));
             
             // Сортируем процессы по порядку
             const sortedProcesses = availableProcesses.sort((a, b) => a.order - b.order);
@@ -177,9 +233,9 @@ const BoardModule = {
             const allColumns = [...sortedProcesses];
             
             // Показываем колонку "Завершено" только если есть доступ к последнему процессу или если админ
-            const hasAccessToLastProcess = isAdmin || DataManager.getProcesses().some(p => 
+            const hasAccessToLastProcess = isAdmin || processes.some(p => 
                 user.processes.includes(p.id) && 
-                DataManager.getProducts().some(prod => 
+                products.some(prod => 
                     prod.processes.length > 0 && 
                     prod.processes[prod.processes.length - 1] === p.id
                 )
@@ -201,7 +257,7 @@ const BoardModule = {
             
             processBoard.innerHTML = allColumns.map(process => {
                 // Получаем заказы для этого процесса
-                let orders = DataManager.getOrders().filter(order => {
+                let processOrders = orders.filter(order => {
                     if (process.id === 0) {
                         return !order.currentProcessId;
                     }
@@ -210,7 +266,7 @@ const BoardModule = {
                 
                 // Фильтруем заказы для обычных пользователей
                 if (!isAdmin) {
-                    orders = orders.filter(order => {
+                    processOrders = processOrders.filter(order => {
                         const product = DataManager.findProduct(order.productId);
                         if (!product) return false;
                         
@@ -228,11 +284,11 @@ const BoardModule = {
                          ${isAdmin ? 'ondrop="BoardModule.handleDrop(event)" ondragover="BoardModule.handleDragOver(event)" ondragenter="BoardModule.handleDragEnter(event)" ondragleave="BoardModule.handleDragLeave(event)"' : ''}>
                         <div class="process-header">
                             <div class="process-title">${process.name}</div>
-                            <div class="process-count">${orders.length} заказов</div>
+                            <div class="process-count">${processOrders.length} заказов</div>
                         </div>
                         <div class="process-items" id="process-${process.id}">
-                            ${orders.length > 0 ? 
-                                orders.map(order => this.renderOrderCard(order, isAdmin)).join('') :
+                            ${processOrders.length > 0 ? 
+                                processOrders.map(order => this.renderOrderCard(order, isAdmin)).join('') :
                                 '<div class="empty-state">Нет заказов</div>'
                             }
                         </div>

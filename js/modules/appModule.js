@@ -50,10 +50,24 @@ const AppModule = {
                 </div>
             `;
             
-            // По умолчанию показываем доску процессов
+            // По умолчанию показываем доску процессов только после загрузки данных
             setTimeout(() => {
                 try {
-                    BoardModule.showProcessBoard();
+                    // Проверяем что данные действительно загружены
+                    const processes = DataManager.getProcesses();
+                    const orders = DataManager.getOrders();
+                    
+                    console.log(`Данные для UI: процессов=${processes.length}, заказов=${orders.length}`);
+                    
+                    if (processes !== undefined && orders !== undefined) {
+                        BoardModule.showProcessBoard();
+                    } else {
+                        console.warn('Данные ещё не загружены, ждём...');
+                        // Пробуем ещё раз через секунду
+                        setTimeout(() => {
+                            BoardModule.showProcessBoard();
+                        }, 1000);
+                    }
                 } catch (error) {
                     console.error('Ошибка при показе доски процессов:', error);
                     document.getElementById('mainContent').innerHTML = `
@@ -64,7 +78,7 @@ const AppModule = {
                         </div>
                     `;
                 }
-            }, 100);
+            }, 500); // Увеличиваем задержку до 500ms
             
         } catch (error) {
             console.error('Ошибка при создании интерфейса:', error);

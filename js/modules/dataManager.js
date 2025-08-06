@@ -6,6 +6,97 @@ const DataManager = {
         products: [],
         orders: [],
         currentUser: null
+    // Обновление сущностей (с отправкой на сервер)
+    async updateUser(id, updatedData) {
+        const user = this.findUser(id);
+        if (!user) {
+            console.error('Пользователь не найден для обновления:', id);
+            return false;
+        }
+        
+        // Обновляем данные
+        Object.assign(user, updatedData);
+        user.id = id; // сохраняем ID
+        
+        this.saveToCache();
+        await this.syncWithServer();
+        
+        // Проверяем ссылочную целостность
+        this.validateReferentialIntegrity();
+        
+        console.log(`✅ Пользователь "${user.name}" обновлен`);
+        return true;
+    },
+    
+    async updateProcess(id, updatedData) {
+        const process = this.findProcess(id);
+        if (!process) {
+            console.error('Процесс не найден для обновления:', id);
+            return false;
+        }
+        
+        // Обновляем данные
+        Object.assign(process, updatedData);
+        process.id = id; // сохраняем ID
+        
+        this.saveToCache();
+        await this.syncWithServer();
+        
+        console.log(`✅ Процесс "${process.name}" обновлен`);
+        return true;
+    },
+    
+    async updateProduct(id, updatedData) {
+        const product = this.findProduct(id);
+        if (!product) {
+            console.error('Изделие не найдено для обновления:', id);
+            return false;
+        }
+        
+        // Обновляем данные
+        Object.assign(product, updatedData);
+        product.id = id; // сохраняем ID
+        
+        // Проверяем что все процессы существуют
+        if (Array.isArray(product.processes)) {
+            const validProcesses = product.processes.filter(processId => {
+                const process = this.findProcess(processId);
+                if (!process) {
+                    console.warn(`⚠️ Процесс ID=${processId} не найден, удаляем из изделия "${product.name}"`);
+                    return false;
+                }
+                return true;
+            });
+            
+            if (validProcesses.length !== product.processes.length) {
+                console.log(`🔧 Процессы изделия "${product.name}" исправлены: ${product.processes.length} -> ${validProcesses.length}`);
+                product.processes = validProcesses;
+            }
+        }
+        
+        this.saveToCache();
+        await this.syncWithServer();
+        
+        console.log(`✅ Изделие "${product.name}" обновлено`);
+        return true;
+    },
+    
+    async updateOrder(id, updatedData) {
+        const order = this.findOrder(id);
+        if (!order) {
+            console.error('Заказ не найден для обновления:', id);
+            return false;
+        }
+        
+        // Обновляем данные
+        Object.assign(order, updatedData);
+        order.id = id; // сохраняем ID
+        
+        this.saveToCache();
+        await this.syncWithServer();
+        
+        console.log(`✅ Заказ "${order.number}" обновлен`);
+        return true;
     },
 
     // Геттеры для данных (с защитой от undefined)
@@ -168,11 +259,30 @@ const DataManager = {
         return order;
     },
 
-    // Поиск сущностей
-    findUser(id) { return this._data.users.find(u => u.id === id); },
-    findProcess(id) { return this._data.processes.find(p => p.id === id); },
-    findProduct(id) { return this._data.products.find(p => p.id === id); },
-    findOrder(id) { return this._data.orders.find(o => o.id === id); },
+    // Поиск сущностей (с нормализацией ID)
+    findUser(id) { 
+        if (id === null || id === undefined) return null;
+        const normalizedId = typeof id === 'string' ? parseInt(id) : id;
+        return this._data.users.find(u => u.id === normalizedId || u.id === String(normalizedId)); 
+    },
+    
+    findProcess(id) { 
+        if (id === null || id === undefined) return null;
+        const normalizedId = typeof id === 'string' ? parseInt(id) : id;
+        return this._data.processes.find(p => p.id === normalizedId || p.id === String(normalizedId)); 
+    },
+    
+    findProduct(id) { 
+        if (id === null || id === undefined) return null;
+        const normalizedId = typeof id === 'string' ? parseInt(id) : id;
+        return this._data.products.find(p => p.id === normalizedId || p.id === String(normalizedId)); 
+    },
+    
+    findOrder(id) { 
+        if (id === null || id === undefined) return null;
+        const normalizedId = typeof id === 'string' ? parseInt(id) : id;
+        return this._data.orders.find(o => o.id === normalizedId || o.id === String(normalizedId)); 
+    },
 
     // Удаление сущностей (с отправкой на сервер)
     async removeUser(id) { 
@@ -405,36 +515,193 @@ const DataManager = {
     // Валидация данных
     validateData() {
         let hasErrors = false;
+        let fixedErrors = [];
         
+        console.log('🔍 Начинаем валидацию данных...');
+        
+        // Проверяем что все массивы
         if (!Array.isArray(this._data.users)) {
             console.warn('⚠️ Пользователи не являются массивом, исправляем...');
             this._data.users = [APP_CONSTANTS.DEFAULTS.ADMIN_USER];
             hasErrors = true;
+            fixedErrors.push('Пользователи сброшены к админу');
         }
         
         if (!Array.isArray(this._data.processes)) {
             console.warn('⚠️ Процессы не являются массивом, исправляем...');
             this._data.processes = [];
             hasErrors = true;
+            fixedErrors.push('Процессы очищены');
         }
         
         if (!Array.isArray(this._data.products)) {
             console.warn('⚠️ Изделия не являются массивом, исправляем...');
             this._data.products = [];
             hasErrors = true;
+            fixedErrors.push('Изделия очищены');
         }
         
         if (!Array.isArray(this._data.orders)) {
             console.warn('⚠️ Заказы не являются массивом, исправляем...');
             this._data.orders = [];
             hasErrors = true;
+            fixedErrors.push('Заказы очищены');
         }
         
+        // Нормализуем ID (все должны быть числами)
+        this._data.users.forEach(user => {
+            if (typeof user.id === 'string' && !isNaN(user.id)) {
+                user.id = parseInt(user.id);
+                hasErrors = true;
+            }
+            // Проверяем массив процессов
+            if (!Array.isArray(user.processes)) {
+                user.processes = [];
+                hasErrors = true;
+            }
+        });
+        
+        this._data.processes.forEach(process => {
+            if (typeof process.id === 'string' && !isNaN(process.id)) {
+                process.id = parseInt(process.id);
+                hasErrors = true;
+            }
+            if (typeof process.order !== 'number') {
+                process.order = 1;
+                hasErrors = true;
+            }
+        });
+        
+        this._data.products.forEach(product => {
+            if (typeof product.id === 'string' && !isNaN(product.id)) {
+                product.id = parseInt(product.id);
+                hasErrors = true;
+            }
+            // Проверяем массив процессов
+            if (!Array.isArray(product.processes)) {
+                product.processes = [];
+                hasErrors = true;
+            }
+        });
+        
+        this._data.orders.forEach(order => {
+            if (typeof order.id === 'string' && !isNaN(order.id)) {
+                order.id = parseInt(order.id);
+                hasErrors = true;
+            }
+            if (typeof order.productId === 'string' && !isNaN(order.productId)) {
+                order.productId = parseInt(order.productId);
+                hasErrors = true;
+            }
+            if (order.currentProcessId && typeof order.currentProcessId === 'string' && !isNaN(order.currentProcessId)) {
+                order.currentProcessId = parseInt(order.currentProcessId);
+                hasErrors = true;
+            }
+            // Проверяем историю
+            if (!Array.isArray(order.history)) {
+                order.history = [];
+                hasErrors = true;
+            }
+        });
+        
+        // Проверяем ссылочную целостность
+        this.validateReferentialIntegrity();
+        
+        // Обновляем порядковые номера процессов
+        this._data.processes.forEach((process, index) => {
+            if (!process.order || process.order !== (index + 1)) {
+                process.order = index + 1;
+                hasErrors = true;
+            }
+        });
+        
         if (hasErrors) {
-            console.log('🔧 Данные исправлены после валидации');
+            console.log('🔧 Данные исправлены после валидации. Исправлено:', fixedErrors);
             this.saveToCache();
         } else {
             console.log('✅ Все данные прошли валидацию');
+        }
+        
+        console.log('📊 Статистика после валидации:', {
+            'Пользователи': this._data.users.length,
+            'Процессы': this._data.processes.length,
+            'Изделия': this._data.products.length,
+            'Заказы': this._data.orders.length
+        });
+    },
+    
+    // Проверка ссылочной целостности
+    validateReferentialIntegrity() {
+        let fixedReferences = 0;
+        
+        console.log('🔗 Проверяем ссылочную целостность...');
+        
+        // Проверяем процессы в изделиях
+        this._data.products.forEach(product => {
+            if (Array.isArray(product.processes)) {
+                const validProcesses = product.processes.filter(processId => {
+                    const process = this.findProcess(processId);
+                    if (!process) {
+                        console.warn(`🔴 Изделие "${product.name}" ссылается на несуществующий процесс ID=${processId}`);
+                        fixedReferences++;
+                        return false;
+                    }
+                    return true;
+                });
+                
+                if (validProcesses.length !== product.processes.length) {
+                    console.log(`🔧 Исправлены процессы для изделия "${product.name}": ${product.processes.length} -> ${validProcesses.length}`);
+                    product.processes = validProcesses;
+                }
+            }
+        });
+        
+        // Проверяем процессы у пользователей
+        this._data.users.forEach(user => {
+            if (Array.isArray(user.processes)) {
+                const validProcesses = user.processes.filter(processId => {
+                    const process = this.findProcess(processId);
+                    if (!process) {
+                        console.warn(`🔴 Пользователь "${user.name}" ссылается на несуществующий процесс ID=${processId}`);
+                        fixedReferences++;
+                        return false;
+                    }
+                    return true;
+                });
+                
+                if (validProcesses.length !== user.processes.length) {
+                    console.log(`🔧 Исправлены процессы для пользователя "${user.name}": ${user.processes.length} -> ${validProcesses.length}`);
+                    user.processes = validProcesses;
+                }
+            }
+        });
+        
+        // Проверяем заказы
+        this._data.orders.forEach(order => {
+            // Проверяем ссылку на изделие
+            const product = this.findProduct(order.productId);
+            if (!product) {
+                console.warn(`🔴 Заказ "${order.number}" ссылается на несуществующее изделие ID=${order.productId}`);
+                // Не удаляем заказ, только логируем
+                fixedReferences++;
+            }
+            
+            // Проверяем текущий процесс
+            if (order.currentProcessId) {
+                const currentProcess = this.findProcess(order.currentProcessId);
+                if (!currentProcess) {
+                    console.warn(`🔴 Заказ "${order.number}" ссылается на несуществующий процесс ID=${order.currentProcessId}`);
+                    // Сбрасываем на null (завершено)
+                    order.currentProcessId = null;
+                    fixedReferences++;
+                }
+            }
+        });
+        
+        if (fixedReferences > 0) {
+            console.log(`🔧 Исправлено ${fixedReferences} нарушений ссылочной целостности`);
+        } else {
+            console.log('✅ Ссылочная целостность сохранена');
         }
     },
 

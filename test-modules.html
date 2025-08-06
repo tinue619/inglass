@@ -22,6 +22,7 @@
     <button class="btn btn-primary" onclick="testModules()">🔍 Проверить модули</button>
     <button class="btn btn-primary" onclick="testBoardModule()">📋 Тест BoardModule</button>
     <button class="btn btn-primary" onclick="forceReloadBoardModule()">🔄 Перезагрузить BoardModule</button>
+    <button class="btn btn-warning" onclick="diagnoseData()">🔍 Диагностика данных</button>
     
     <!-- Подключаем модули в том же порядке что и в index.html -->
     <script src="js/utils/constants.js"></script>
@@ -45,6 +46,115 @@
             div.textContent = message;
             results.appendChild(div);
             console.log(`[${type}] ${message}`);
+        }
+        
+        // Функция диагностики данных
+        async function diagnoseData() {
+            addResult('🔍 Начинаем диагностику данных...', 'info');
+            
+            try {
+                // Загружаем данные
+                await DataManager.load();
+                
+                // Получаем все данные
+                const users = DataManager.getUsers();
+                const processes = DataManager.getProcesses();
+                const products = DataManager.getProducts();
+                const orders = DataManager.getOrders();
+                
+                addResult(`📊 Общая статистика: Пользователи=${users.length}, Процессы=${processes.length}, Изделия=${products.length}, Заказы=${orders.length}`, 'info');
+                
+                // Проверяем процессы
+                if (processes.length === 0) {
+                    addResult('⚠️ Нет процессов! Создайте процессы в админ панели', 'error');
+                } else {
+                    addResult(`✅ Процессы найдены: ${processes.map(p => p.name).join(', ')}`, 'success');
+                }
+                
+                // Проверяем изделия
+                if (products.length === 0) {
+                    addResult('⚠️ Нет изделий! Создайте изделия в админ панели', 'error');
+                } else {
+                    // Проверяем каждое изделие
+                    products.forEach(product => {
+                        if (!product.processes || product.processes.length === 0) {
+                            addResult(`❌ Изделие "${product.name}" не имеет процессов!`, 'error');
+                        } else {
+                            // Проверяем каждый процесс в изделии
+                            const invalidProcesses = product.processes.filter(pid => {
+                                const process = DataManager.findProcess(pid);
+                                return !process;
+                            });
+                            
+                            if (invalidProcesses.length > 0) {
+                                addResult(`❌ Изделие "${product.name}" ссылается на несуществующие процессы: ${invalidProcesses.join(', ')}`, 'error');
+                            } else {
+                                const processNames = product.processes.map(pid => {
+                                    const process = DataManager.findProcess(pid);
+                                    return process ? process.name : 'Неизвестный';
+                                }).join(' → ');
+                                addResult(`✅ Изделие "${product.name}": ${processNames}`, 'success');
+                            }
+                        }
+                    });
+                }
+                
+                // Проверяем заказы
+                if (orders.length === 0) {
+                    addResult('ℹ️ Нет заказов - это нормально для новой системы', 'info');
+                } else {
+                    let problemOrders = 0;
+                    orders.forEach(order => {
+                        const product = DataManager.findProduct(order.productId);
+                        if (!product) {
+                            addResult(`❌ Заказ "${order.number}" ссылается на несуществующее изделие ID=${order.productId}`, 'error');
+                            problemOrders++;
+                        } else if (order.currentProcessId) {
+                            const currentProcess = DataManager.findProcess(order.currentProcessId);
+                            if (!currentProcess) {
+                                addResult(`❌ Заказ "${order.number}" ссылается на несуществующий процесс ID=${order.currentProcessId}`, 'error');
+                                problemOrders++;
+                            }
+                        }
+                    });
+                    
+                    if (problemOrders === 0) {
+                        addResult(`✅ Все ${orders.length} заказов в порядке`, 'success');
+                    } else {
+                        addResult(`⚠️ Найдено ${problemOrders} проблемных заказов`, 'error');
+                    }
+                }
+                
+                // Проверяем ссылочную целостность
+                addResult('🔗 Запускаем проверку ссылочной целостности...', 'info');
+                DataManager.validateReferentialIntegrity();
+                addResult('✅ Проверка ссылочной целостности завершена', 'success');
+                
+                // Рекомендации
+                addResult('💡 Рекомендации:', 'info');
+                
+                if (processes.length === 0) {
+                    addResult('• Создайте процессы (например: Прием заказа, Замер, Резка, Упаковка)', 'info');
+                }
+                
+                if (products.length === 0) {
+                    addResult('• Создайте изделия и назначьте им процессы', 'info');
+                }
+                
+                if (orders.length === 0 && products.length > 0) {
+                    addResult('• Создайте тестовые заказы для проверки работы системы', 'info');
+                }
+                
+                if (processes.length > 0 && products.length > 0) {
+                    addResult('• Система готова к работе! Можно создавать заказы', 'success');
+                }
+                
+                addResult('✅ Диагностика завершена!', 'success');
+                
+            } catch (error) {
+                addResult(`❌ Ошибка диагностики: ${error.message}`, 'error');
+                console.error('Полная ошибка диагностики:', error);
+            }
         }
         
         function testModules() {

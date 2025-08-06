@@ -413,18 +413,39 @@ const AdminModule = {
             </div>
         `;
         
-        ModalModule.show('Редактировать изделие', form, () => {
-            product.name = document.getElementById('product-name').value.trim();
-            product.processes = Array.from(document.querySelectorAll('.product-process-checkbox:checked')).map(cb => parseInt(cb.value));
+        ModalModule.show('Редактировать изделие', form, async () => {
+            const newName = document.getElementById('product-name').value.trim();
+            const newProcesses = Array.from(document.querySelectorAll('.product-process-checkbox:checked')).map(cb => parseInt(cb.value));
             
-            if (product.processes.length === 0) {
+            if (!newName) {
+                alert('Введите название изделия');
+                return false;
+            }
+            if (newProcesses.length === 0) {
                 alert('Выберите хотя бы один процесс');
                 return false;
             }
             
-            DataManager.save();
-            this.renderProductsTable();
-            return true;
+            console.log('🔧 Обновляем изделие:', productId, { name: newName, processes: newProcesses });
+            
+            // Используем безопасный метод обновления
+            const success = await DataManager.updateProduct(productId, {
+                name: newName,
+                processes: newProcesses
+            });
+            
+            if (success) {
+                this.renderProductsTable();
+                // Обновляем доску если она открыта
+                if (typeof BoardModule.renderProcessBoard === 'function' && document.getElementById('processBoard')) {
+                    BoardModule.renderProcessBoard();
+                }
+                console.log('✅ Изделие успешно обновлено');
+                return true;
+            } else {
+                alert('Ошибка обновления изделия');
+                return false;
+            }
         });
     },
 

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="api-url" content="https://inglass-9be99f83200c.herokuapp.com/api">
+    <title>🔧 Отладка API подключения</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f0f0f0; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; font-weight: bold; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button { 
+            background: #007bff; color: white; border: none; 
+            padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .log { 
+            background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; 
+            height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px;
+        }
+        .url-test { 
+            display: flex; margin: 10px 0; align-items: center; gap: 10px;
+        }
+        .url-test input { 
+            flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Отладка API подключения</h1>
+        
+        <div id="status" class="status warning">Проверяю конфигурацию...</div>
+        
+        <h3>🌐 Тестирование URL:</h3>
+        <div class="url-test">
+            <input type="text" id="testUrl" value="https://inglass-9be99f83200c.herokuapp.com/api/health" placeholder="URL для тестирования">
+            <button onclick="testUrl()">🧪 Тест</button>
+        </div>
+        
+        <div>
+            <button onclick="checkConfig()">🔧 Проверить конфигурацию</button>
+            <button onclick="testAllEndpoints()">🌐 Тест всех endpoint'ов</button>
+            <button onclick="clearLog()">🗑️ Очистить лог</button>
+        </div>
+        
+        <h3>📝 Лог:</h3>
+        <div class="log" id="log"></div>
+    </div>
+
+    <script src="js/utils/config.js"></script>
+    <script>
+        let logDiv = document.getElementById('log');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : type === 'warning' ? '#ffc107' : '#17a2b8';
+            logDiv.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[DEBUG] ${message}`);
+        }
+        
+        function clearLog() {
+            logDiv.innerHTML = '';
+        }
+        
+        function updateStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+        
+        function checkConfig() {
+            log('🔧 Проверяю конфигурацию...');
+            
+            // Проверяем загрузку config.js
+            if (typeof window.APP_CONFIG === 'undefined') {
+                log('❌ config.js не загружен!', 'error');
+                updateStatus('❌ config.js не найден', 'error');
+                return;
+            }
+            
+            const info = window.APP_CONFIG.getInfo();
+            log('✅ config.js загружен успешно', 'success');
+            log(`📍 Домен: ${info.domain}`);
+            log(`🏠 Локально: ${info.isLocal ? 'Да' : 'Нет'}`);
+            log(`📖 Статический хостинг: ${info.isStatic ? 'Да' : 'Нет'}`);
+            log(`🔗 API URL: ${info.apiUrl}`);
+            log(`✅ URL валидный: ${info.valid ? 'Да' : 'Нет'}`);
+            
+            // Проверяем мета-тег
+            const apiMeta = document.querySelector('meta[name="api-url"]');
+            if (apiMeta && apiMeta.content) {
+                log(`🏷️ Мета-тег найден: ${apiMeta.content}`, 'success');
+            } else {
+                log('⚠️ Мета-тег api-url не найден', 'warning');
+            }
+            
+            updateStatus(`API URL: ${info.apiUrl}`, info.valid ? 'success' : 'error');
+        }
+        
+        async function testUrl() {
+            const url = document.getElementById('testUrl').value;
+            log(`🌐 Тестирую URL: ${url}`);
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    },
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                log(`📊 Статус ответа: ${response.status} ${response.statusText}`);
+                
+                if (response.ok) {
+                    try {
+                        const data = await response.json();
+                        log('✅ Сервер доступен и отвечает JSON', 'success');
+                        log(`📄 Ответ: ${JSON.stringify(data, null, 2)}`);
+                        updateStatus('✅ Сервер доступен', 'success');
+                    } catch (jsonError) {
+                        const text = await response.text();
+                        log('⚠️ Сервер отвечает не JSON', 'warning');
+                        log(`📄 Ответ: ${text.substring(0, 200)}...`);
+                        updateStatus('⚠️ Сервер отвечает не JSON', 'warning');
+                    }
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ HTTP ошибка: ${response.status}`, 'error');
+                    log(`📄 Текст ошибки: ${errorText.substring(0, 200)}...`);
+                    updateStatus(`❌ HTTP ${response.status}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Ошибка соединения: ${error.message}`, 'error');
+                if (error.name === 'AbortError') {
+                    log('⏰ Превышено время ожидания (10 сек)', 'error');
+                    updateStatus('⏰ Тайм-аут', 'error');
+                } else {
+                    updateStatus('❌ Нет соединения', 'error');
+                }
+            }
+        }
+        
+        async function testAllEndpoints() {
+            if (typeof window.APP_CONFIG === 'undefined') {
+                log('❌ Сначала проверьте конфигурацию!', 'error');
+                return;
+            }
+            
+            const baseUrl = window.APP_CONFIG.getApiUrl();
+            const endpoints = [
+                '/health',
+                '/data',
+                '/sync-info'
+            ];
+            
+            log('🧪 Тестирую все endpoint\'ы...');
+            
+            for (const endpoint of endpoints) {
+                const fullUrl = baseUrl + endpoint;
+                log(`\n🔍 Тест: ${endpoint}`);
+                document.getElementById('testUrl').value = fullUrl;
+                await testUrl();
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Пауза между запросами
+            }
+            
+            log('\n🏁 Тестирование завершено');
+        }
+        
+        // Автозапуск при загрузке страницы
+        window.addEventListener('load', () => {
+            log('🚀 Страница загружена, начинаю диагностику...');
+            setTimeout(checkConfig, 500);
+            setTimeout(testUrl, 1000);
+        });
+    </script>
+</body>
+</html>

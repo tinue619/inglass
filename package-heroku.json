@@ -2,9 +2,10 @@
   "name": "inglass-crm-api",
   "version": "1.0.0",
   "description": "Inglass CRM API Server for Heroku",
-  "main": "server-heroku.js",
+  "main": "server-hosting.js",
   "scripts": {
-    "start": "node server-heroku.js"
+    "start": "node server-hosting.js",
+    "dev": "node server/server.js"
   },
   "dependencies": {
     "express": "^4.18.2",

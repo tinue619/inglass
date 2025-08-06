@@ -6,21 +6,20 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const DATA_DIR = path.join(__dirname, 'data');
-const DATA_FILE = path.join(DATA_DIR, 'crm-data.json');
 
-// Middleware
+// Простое файловое хранилище (как в локальной версии)
+const DATA_FILE = path.join(__dirname, 'heroku-data.json');
+
+// CORS middleware с расширенными настройками
 app.use(cors({
     origin: true, // Разрешаем все домены
-    credentials: true, // Поддержка cookies
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Cache-Control', 'Pragma'],
     exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar']
 }));
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(bodyParser.urlencoded({ extended: true }));
 
-// Обработчик preflight запросов CORS
+// Preflight requests
 app.options('*', (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -28,13 +27,13 @@ app.options('*', (req, res) => {
     res.sendStatus(200);
 });
 
-// Создаем директорию для данных если её нет
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    console.log('📁 Создана директория для данных:', DATA_DIR);
-}
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// Функция для чтения данных
+// Статические файлы (фронтенд)
+app.use(express.static(__dirname));
+
+// Функции для работы с данными
 function readData() {
     try {
         if (fs.existsSync(DATA_FILE)) {
@@ -80,7 +79,6 @@ function readData() {
     }
 }
 
-// Функция для записи данных
 function writeData(data) {
     try {
         data.lastSync = new Date().toISOString();
@@ -93,32 +91,18 @@ function writeData(data) {
     }
 }
 
-// Создание резервной копии
-function createBackup() {
-    try {
-        const data = readData();
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const backupFile = path.join(DATA_DIR, `backup-${timestamp}.json`);
-        fs.writeFileSync(backupFile, JSON.stringify(data, null, 2), 'utf8');
-        console.log('🔄 Создана резервная копия:', backupFile);
-        
-        // Удаляем старые бэкапы (оставляем только последние 10)
-        const backupFiles = fs.readdirSync(DATA_DIR)
-            .filter(file => file.startsWith('backup-'))
-            .sort()
-            .reverse();
-            
-        if (backupFiles.length > 10) {
-            for (let i = 10; i < backupFiles.length; i++) {
-                fs.unlinkSync(path.join(DATA_DIR, backupFiles[i]));
-            }
-        }
-    } catch (error) {
-        console.error('Ошибка создания резервной копии:', error);
-    }
-}
-
 // API Routes
+
+// Проверка состояния сервера
+app.get('/api/health', (req, res) => {
+    res.json({
+        success: true,
+        message: 'Inglass CRM Server работает на Heroku',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || 'production'
+    });
+});
 
 // Получить все данные
 app.get('/api/data', (req, res) => {
@@ -143,7 +127,6 @@ app.post('/api/data', (req, res) => {
     try {
         const newData = req.body;
         
-        // Валидация данных
         if (!newData || typeof newData !== 'object') {
             return res.status(400).json({
                 success: false,
@@ -151,10 +134,13 @@ app.post('/api/data', (req, res) => {
             });
         }
         
-        // Создаем резервную копию перед записью
-        createBackup();
+        console.log('📝 Получены данные для сохранения:', {
+            users: newData.users?.length || 0,
+            processes: newData.processes?.length || 0,
+            products: newData.products?.length || 0,
+            orders: newData.orders?.length || 0
+        });
         
-        // Сохраняем данные
         const success = writeData(newData);
         
         if (success) {
@@ -178,92 +164,7 @@ app.post('/api/data', (req, res) => {
     }
 });
 
-// Получить конкретную сущность
-app.get('/api/:entity', (req, res) => {
-    try {
-        const { entity } = req.params;
-        const data = readData();
-        
-        if (data.hasOwnProperty(entity)) {
-            res.json({
-                success: true,
-                data: data[entity],
-                timestamp: new Date().toISOString()
-            });
-        } else {
-            res.status(404).json({
-                success: false,
-                error: `Сущность ${entity} не найдена`
-            });
-        }
-    } catch (error) {
-        console.error('Ошибка получения сущности:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Ошибка получения данных'
-        });
-    }
-});
-
-// Обновить конкретную сущность
-app.post('/api/:entity', (req, res) => {
-    try {
-        const { entity } = req.params;
-        const newEntityData = req.body;
-        
-        console.log(`📤 Получен запрос на обновление ${entity}:`, newEntityData);
-        
-        const data = readData();
-        
-        if (!data.hasOwnProperty(entity)) {
-            console.error(`Сущность ${entity} не найдена`);
-            return res.status(404).json({
-                success: false,
-                error: `Сущность ${entity} не найдена`
-            });
-        }
-        
-        // Создаем резервную копию
-        createBackup();
-        
-        // Обновляем данные
-        data[entity] = newEntityData;
-        const success = writeData(data);
-        
-        if (success) {
-            console.log(`✅ Сущность ${entity} успешно обновлена`);
-            res.json({
-                success: true,
-                message: `Сущность ${entity} успешно обновлена`,
-                timestamp: new Date().toISOString()
-            });
-        } else {
-            res.status(500).json({
-                success: false,
-                error: 'Ошибка сохранения данных'
-            });
-        }
-    } catch (error) {
-        console.error('Ошибка обновления сущности:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Ошибка обновления данных',
-            details: error.message
-        });
-    }
-});
-
-// Проверка состояния сервера
-app.get('/api/health', (req, res) => {
-    res.json({
-        success: true,
-        message: 'Сервер работает',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime()
-    });
-});
-
-// Получить информацию о последней синхронизации
+// Получить информацию о синхронизации
 app.get('/api/sync-info', (req, res) => {
     try {
         const data = readData();
@@ -273,12 +174,16 @@ app.get('/api/sync-info', (req, res) => {
             timestamp: new Date().toISOString()
         });
     } catch (error) {
-        console.error('Ошибка получения информации о синхронизации:', error);
         res.status(500).json({
             success: false,
             error: 'Ошибка получения информации'
         });
     }
+});
+
+// Главная страница
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Обработка ошибок
@@ -299,10 +204,14 @@ app.use((req, res) => {
 });
 
 // Запуск сервера
-app.listen(PORT, () => {
-    console.log(`🚀 Inglass CRM Server запущен на порту ${PORT}`);
-    console.log(`📊 API доступен по адресу: http://localhost:${PORT}/api`);
-    console.log(`📁 Данные хранятся в: ${DATA_FILE}`);
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Inglass CRM Server запущен на Heroku!`);
+    console.log(`🔗 Порт: ${PORT}`);
+    console.log(`🌐 Приложение доступно по адресу приложения Heroku`);
+    console.log(`📊 API: /api`);
+    console.log(`📁 Данные: ${DATA_FILE}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'production'}`);
+    console.log('✅ Система готова к работе!');
     
     // Инициализируем данные при запуске
     const data = readData();
@@ -310,12 +219,4 @@ app.listen(PORT, () => {
     console.log(`⚙️ Процессов: ${data.processes.length}`);
     console.log(`📦 Изделий: ${data.products.length}`);
     console.log(`📋 Заказов: ${data.orders.length}`);
-});
-
-// Graceful shutdown
-process.on('SIGINT', () => {
-    console.log('\n🛑 Получен сигнал завершения, создаем финальную резервную копию...');
-    createBackup();
-    console.log('✅ Сервер остановлен');
-    process.exit(0);
 });

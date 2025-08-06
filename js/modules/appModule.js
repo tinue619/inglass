@@ -22,8 +22,8 @@ const AppModule = {
                         </div>
                         <div class="header-actions">
                             <div class="sync-status" id="syncStatus">
-                                <button class="btn btn-secondary btn-small" onclick="APIService.forceSync()" title="Ручная синхронизация">
-                                    🔄 Синхронизация
+                                <button class="btn btn-secondary btn-small" onclick="AppModule.forceSyncData()" title="Принудительная синхронизация">
+                                    <span id="syncIcon">🔄</span> <span id="syncText">Синхронизация</span>
                                 </button>
                             </div>
                             <div class="user-info">
@@ -158,6 +158,83 @@ const AppModule = {
                 console.error('Ошибка при сохранении:', error);
             }
         });
+    },
+
+    // Принудительная синхронизация данных
+    async forceSyncData() {
+        const syncIcon = document.getElementById('syncIcon');
+        const syncText = document.getElementById('syncText');
+        
+        if (!syncIcon || !syncText) {
+            // Если элементов нет, используем APIService напрямую
+            if (window.APIService) {
+                await window.APIService.forceSync();
+            }
+            return;
+        }
+        
+        try {
+            // Показываем процесс синхронизации
+            syncIcon.textContent = '⏳';
+            syncText.textContent = 'Синхронизация...';
+            
+            console.log('🔄 Начинаем принудительную синхронизацию...');
+            
+            let success = false;
+            
+            // Проверяем статус сервера
+            if (window.APIService) {
+                const serverAvailable = await window.APIService.checkServerStatus();
+                
+                if (serverAvailable) {
+                    // Загружаем данные с сервера
+                    const loadSuccess = await window.APIService.loadFromServer();
+                    // Отправляем локальные данные
+                    const saveSuccess = await window.APIService.saveToServer();
+                    
+                    success = loadSuccess || saveSuccess;
+                    
+                    if (loadSuccess && saveSuccess) {
+                        syncIcon.textContent = '✅';
+                        syncText.textContent = 'Синхронизировано';
+                        console.log('✅ Полная синхронизация успешна');
+                    } else if (loadSuccess) {
+                        syncIcon.textContent = '⬇️';
+                        syncText.textContent = 'Загружено';
+                        console.log('✅ Данные загружены с сервера');
+                    } else if (saveSuccess) {
+                        syncIcon.textContent = '⬆️';
+                        syncText.textContent = 'Отправлено';
+                        console.log('✅ Данные отправлены на сервер');
+                    }
+                    
+                    // Обновляем интерфейс
+                    if (success && window.BoardModule && typeof BoardModule.renderBoard === 'function') {
+                        BoardModule.renderBoard();
+                    }
+                    
+                } else {
+                    syncIcon.textContent = '❌';
+                    syncText.textContent = 'Сервер недоступен';
+                    console.log('❌ Сервер недоступен');
+                }
+            } else {
+                syncIcon.textContent = '⚠️';
+                syncText.textContent = 'APIService недоступен';
+                console.log('⚠️ APIService недоступен');
+            }
+            
+        } catch (error) {
+            console.error('❌ Ошибка синхронизации:', error);
+            syncIcon.textContent = '❌';
+            syncText.textContent = 'Ошибка';
+        }
+        
+        // Возвращаем обычное состояние через 3 секунды
+        setTimeout(() => {
+            syncIcon.textContent = '🔄';
+            syncText.textContent = 'Синхронизация';
+        }, 3000);
     }
 };
 

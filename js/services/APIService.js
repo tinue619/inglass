@@ -23,22 +23,34 @@ class APIService {
     
     async checkServerStatus() {
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            
             const response = await fetch(`${this.baseUrl}/health`, {
                 method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-                timeout: 5000
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache'
+                },
+                signal: controller.signal
             });
+            
+            clearTimeout(timeoutId);
             
             if (response.ok) {
                 const result = await response.json();
-                if (result.success && !this.isOnline) {
-                    console.log('🟢 Сервер доступен, переключаемся в онлайн режим');
+                if (result.success) {
+                    const wasOffline = !this.isOnline;
                     this.isOnline = true;
                     this.retryCount = 0;
-                    this.showConnectionStatus(true);
                     
-                    // При восстановлении соединения загружаем данные с сервера
-                    await this.loadFromServer();
+                    if (wasOffline) {
+                        console.log('🟢 Сервер доступен, переключаемся в онлайн режим');
+                        this.showConnectionStatus(true);
+                        
+                        // При восстановлении соединения загружаем данные с сервера
+                        await this.loadFromServer();
+                    }
                 }
                 return true;
             }
@@ -53,29 +65,62 @@ class APIService {
     }
     
     showConnectionStatus(online) {
+        // Удаляем старый индикатор
         const existingIndicator = document.querySelector('.connection-status');
         if (existingIndicator) existingIndicator.remove();
         
-        const indicator = document.createElement('div');
-        indicator.className = `connection-status ${online ? 'online' : 'offline'}`;
-        indicator.textContent = online ? '🟢 Онлайн (Сервер)' : '🟡 Автономно (Кэш)';
-        indicator.style.cssText = `
-            position: fixed; top: 20px; right: 20px; z-index: 1000;
-            padding: 8px 12px; border-radius: 4px; font-size: 12px;
-            background: ${online ? '#d4edda' : '#fff3cd'};
-            border: 1px solid ${online ? '#c3e6cb' : '#ffeaa7'};
-            color: ${online ? '#155724' : '#856404'};
-        `;
-        document.body.appendChild(indicator);
+        // Обновляем кнопку синхронизации в шапке
+        const syncIcon = document.getElementById('syncIcon');
+        const syncText = document.getElementById('syncText');
+        const syncButton = syncIcon?.parentElement;
         
-        if (online) {
-            setTimeout(() => {
-                if (indicator.parentNode) {
-                    indicator.style.opacity = '0';
-                    setTimeout(() => indicator.remove(), 300);
-                }
-            }, 3000);
+        if (syncButton) {
+            if (online) {
+                syncButton.style.backgroundColor = '#d4edda';
+                syncButton.style.borderColor = '#c3e6cb';
+                syncButton.style.color = '#155724';
+                syncButton.title = 'Подключение к серверу активно';
+            } else {
+                syncButton.style.backgroundColor = '#fff3cd';
+                syncButton.style.borderColor = '#ffeaa7';
+                syncButton.style.color = '#856404';
+                syncButton.title = 'Автономный режим - сервер недоступен';
+            }
         }
+        
+        // Показываем всплывающее уведомление только при изменении статуса
+        if (online && !this.lastNotificationWasOnline) {
+            this.showPopupNotification('🟢 Подключение к серверу восстановлено', '#d4edda');
+            this.lastNotificationWasOnline = true;
+        } else if (!online && this.lastNotificationWasOnline !== false) {
+            this.showPopupNotification('🔴 Потеряно подключение к серверу', '#f8d7da');
+            this.lastNotificationWasOnline = false;
+        }
+    }
+    
+    showPopupNotification(message, bgColor) {
+        const notification = document.createElement('div');
+        notification.className = 'popup-notification';
+        notification.textContent = message;
+        notification.style.cssText = `
+            position: fixed; top: 70px; right: 20px; z-index: 1000;
+            padding: 12px 16px; border-radius: 6px; font-size: 14px;
+            background: ${bgColor}; border: 1px solid rgba(0,0,0,0.1);
+            color: #333; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateX(100%); transition: transform 0.3s ease;
+        `;
+        document.body.appendChild(notification);
+        
+        // Плавное появление
+        setTimeout(() => {
+            notification.style.transform = 'translateX(0)';
+        }, 100);
+        
+        // Автоматическое скрытие
+        setTimeout(() => {
+            notification.style.transform = 'translateX(100%)';
+            setTimeout(() => notification.remove(), 300);
+        }, 4000);
     }
     
     // Загрузить данные с сервера
@@ -90,13 +135,24 @@ class APIService {
             
             const response = await fetch(`${this.baseUrl}/data`, {
                 method: 'GET',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache'
+                }
             });
             
             if (response.ok) {
                 const result = await response.json();
                 if (result.success && result.data) {
                     const serverData = result.data;
+                    
+                    console.log('📊 Данные с сервера:', {
+                        users: serverData.users?.length || 0,
+                        processes: serverData.processes?.length || 0,
+                        products: serverData.products?.length || 0,
+                        orders: serverData.orders?.length || 0
+                    });
                     
                     // Используем безопасный метод DataManager для обновления
                     const success = DataManager.updateFromServer(serverData);

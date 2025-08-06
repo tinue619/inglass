@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Диагностика загрузки модулей</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .status { padding: 10px; margin: 5px 0; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; border-left: 4px solid #28a745; }
+        .error { background: #f8d7da; color: #721c24; border-left: 4px solid #dc3545; }
+        .info { background: #d1ecf1; color: #0c5460; border-left: 4px solid #17a2b8; }
+        .warning { background: #fff3cd; color: #856404; border-left: 4px solid #ffc107; }
+        h1 { color: #333; }
+        .btn { padding: 8px 16px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Диагностика загрузки модулей</h1>
+        <p>Проверяем загрузку всех модулей системы...</p>
+        
+        <button class="btn btn-primary" onclick="location.reload()">🔄 Обновить</button>
+        <a href="index.html" class="btn btn-success" target="_blank">🚀 Открыть основное приложение</a>
+        
+        <div id="results"></div>
+    </div>
+    
+    <script>
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = message;
+            document.getElementById('results').appendChild(div);
+            console.log(`[${type}] ${message}`);
+        }
+        
+        addResult('🚀 Начинаем диагностику...', 'info');
+    </script>
+    
+    <!-- Загружаем модули по одному с проверкой -->
+    <script src="js/utils/constants.js"></script>
+    <script>
+        try {
+            if (typeof APP_CONSTANTS !== 'undefined') {
+                addResult('✅ <strong>APP_CONSTANTS</strong> загружен успешно', 'success');
+            } else {
+                addResult('❌ <strong>APP_CONSTANTS</strong> НЕ загружен', 'error');
+            }
+        } catch (error) {
+            addResult(`❌ Ошибка загрузки <strong>APP_CONSTANTS</strong>: ${error.message}`, 'error');
+        }
+    </script>
+    
+    <script src="js/services/APIService-simple.js"></script>
+    <script>
+        try {
+            if (typeof window.APIService !== 'undefined') {
+                addResult('✅ <strong>APIService</strong> (упрощенный) загружен успешно', 'success');
+            } else {
+                addResult('❌ <strong>APIService</strong> НЕ загружен', 'error');
+            }
+        } catch (error) {
+            addResult(`❌ Ошибка загрузки <strong>APIService</strong>: ${error.message}`, 'error');
+        }
+    </script>
+    
+    <script src="js/modules/dataManager.js"></script>
+    <script>
+        try {
+            if (typeof DataManager !== 'undefined') {
+                addResult('✅ <strong>DataManager</strong> загружен успешно', 'success');
+                
+                // Тестируем базовые функции
+                try {
+                    const users = DataManager.getUsers();
+                    addResult(`&nbsp;&nbsp;&nbsp;👥 Пользователи: ${users.length}`, 'success');
+                    
+                    const processes = DataManager.getProcesses();
+                    addResult(`&nbsp;&nbsp;&nbsp;⚙️ Процессы: ${processes.length}`, 'success');
+                    
+                } catch (funcError) {
+                    addResult(`&nbsp;&nbsp;&nbsp;❌ Ошибка функций DataManager: ${funcError.message}`, 'error');
+                }
+                
+            } else {
+                addResult('❌ <strong>DataManager</strong> НЕ загружен', 'error');
+            }
+        } catch (error) {
+            addResult(`❌ Критическая ошибка загрузки <strong>DataManager</strong>: ${error.message}`, 'error');
+        }
+    </script>
+    
+    <script src="js/modules/boardModule.js"></script>
+    <script>
+        try {
+            if (typeof BoardModule !== 'undefined') {
+                addResult('✅ <strong>BoardModule</strong> загружен успешно', 'success');
+                
+                if (typeof BoardModule.showProcessBoard === 'function') {
+                    addResult('&nbsp;&nbsp;&nbsp;✅ showProcessBoard() доступна', 'success');
+                } else {
+                    addResult('&nbsp;&nbsp;&nbsp;❌ showProcessBoard() НЕ функция', 'error');
+                }
+                
+            } else {
+                addResult('❌ <strong>BoardModule</strong> НЕ загружен', 'error');
+            }
+        } catch (error) {
+            addResult(`❌ Критическая ошибка загрузки <strong>BoardModule</strong>: ${error.message}`, 'error');
+        }
+    </script>
+    
+    <script>
+        addResult('🏁 Диагностика завершена!', 'info');
+        
+        // Итоговая проверка
+        const criticalModules = [
+            { name: 'APP_CONSTANTS', check: () => typeof APP_CONSTANTS !== 'undefined' },
+            { name: 'DataManager', check: () => typeof DataManager !== 'undefined' },
+            { name: 'BoardModule', check: () => typeof BoardModule !== 'undefined' },
+            { name: 'APIService', check: () => typeof window.APIService !== 'undefined' }
+        ];
+        
+        const failedModules = criticalModules.filter(module => !module.check());
+        
+        if (failedModules.length === 0) {
+            addResult('🎉 <strong>ВСЕ КРИТИЧЕСКИЕ МОДУЛИ ЗАГРУЖЕНЫ!</strong> Система готова к работе!', 'success');
+            addResult('👉 Можно открывать основное приложение', 'success');
+        } else {
+            addResult(`⚠️ <strong>ПРОБЛЕМЫ С МОДУЛЯМИ:</strong> ${failedModules.map(m => m.name).join(', ')}`, 'error');
+            addResult('🔧 Проверьте файлы и исправьте ошибки', 'warning');
+        }
+    </script>
+</body>
+</html>

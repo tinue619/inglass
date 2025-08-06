@@ -6,6 +6,7 @@ const DataManager = {
         products: [],
         orders: [],
         currentUser: null
+    },
     // Обновление сущностей (с отправкой на сервер)
     async updateUser(id, updatedData) {
         const user = this.findUser(id);

@@ -69,7 +69,8 @@ const AuthModule = {
         
         try {
             // Отправляем запрос на сервер для аутентификации
-            const response = await fetch('/api/auth/login', {
+            const apiUrl = window.APP_CONFIG ? window.APP_CONFIG.getApiUrl() : '/api';
+            const response = await fetch(`${apiUrl}/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

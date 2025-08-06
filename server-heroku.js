@@ -104,6 +104,53 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// Аутентификация пользователя
+app.post('/api/auth/login', (req, res) => {
+    try {
+        const { phone, password } = req.body;
+        
+        if (!phone || !password) {
+            return res.status(400).json({
+                success: false,
+                error: 'Телефон и пароль обязательны'
+            });
+        }
+        
+        const data = readData();
+        const user = data.users.find(u => u.phone === phone);
+        
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                error: 'Неверный телефон или пароль'
+            });
+        }
+        
+        // Простая проверка пароля (в реальном проекте используйте bcrypt)
+        if (user.password !== password) {
+            return res.status(401).json({
+                success: false,
+                error: 'Неверный телефон или пароль'
+            });
+        }
+        
+        // Возвращаем данные пользователя без пароля
+        const { password: _, ...userWithoutPassword } = user;
+        
+        res.json({
+            success: true,
+            user: userWithoutPassword
+        });
+        
+    } catch (error) {
+        console.error('Ошибка аутентификации:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Ошибка сервера'
+        });
+    }
+});
+
 // Получить все данные
 app.get('/api/data', (req, res) => {
     try {

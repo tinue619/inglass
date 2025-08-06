@@ -27,6 +27,118 @@ app.options('*', (req, res) => {
     res.sendStatus(200);
 });
 
+// === Дополнительные API роуты ===
+
+// Пользователи
+app.get('/api/users', (req, res) => {
+    try {
+        const data = readData();
+        res.json({ success: true, data: data.users || [] });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post('/api/users', (req, res) => {
+    try {
+        const data = readData();
+        const newUser = { ...req.body, id: Date.now() };
+        data.users = data.users || [];
+        data.users.push(newUser);
+        writeData(data);
+        res.json({ success: true, id: newUser.id });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Процессы
+app.get('/api/processes', (req, res) => {
+    try {
+        const data = readData();
+        res.json({ success: true, data: data.processes || [] });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post('/api/processes', (req, res) => {
+    try {
+        const data = readData();
+        const newProcess = { ...req.body, id: Date.now() };
+        data.processes = data.processes || [];
+        data.processes.push(newProcess);
+        writeData(data);
+        res.json({ success: true, id: newProcess.id });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Изделия
+app.get('/api/products', (req, res) => {
+    try {
+        const data = readData();
+        res.json({ success: true, data: data.products || [] });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post('/api/products', (req, res) => {
+    try {
+        const data = readData();
+        const newProduct = { ...req.body, id: Date.now() };
+        data.products = data.products || [];
+        data.products.push(newProduct);
+        writeData(data);
+        res.json({ success: true, id: newProduct.id });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Заказы
+app.get('/api/orders', (req, res) => {
+    try {
+        const data = readData();
+        res.json({ success: true, data: data.orders || [] });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post('/api/orders', (req, res) => {
+    try {
+        const data = readData();
+        const newOrder = { ...req.body, id: Date.now() };
+        data.orders = data.orders || [];
+        data.orders.push(newOrder);
+        writeData(data);
+        res.json({ success: true, id: newOrder.id });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.put('/api/orders/:id', (req, res) => {
+    try {
+        const orderId = parseInt(req.params.id);
+        const data = readData();
+        const orderIndex = data.orders.findIndex(o => o.id === orderId);
+        
+        if (orderIndex === -1) {
+            return res.status(404).json({ success: false, error: 'Заказ не найден' });
+        }
+        
+        data.orders[orderIndex] = { ...data.orders[orderIndex], ...req.body };
+        writeData(data);
+        res.json({ success: true, message: 'Заказ обновлен' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true }));
 

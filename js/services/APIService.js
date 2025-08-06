@@ -14,6 +14,12 @@ class APIService {
     }
     
     getBaseUrl() {
+        // Используем универсальную конфигурацию
+        if (window.APP_CONFIG && typeof window.APP_CONFIG.getApiUrl === 'function') {
+            return window.APP_CONFIG.getApiUrl();
+        }
+        
+        // Fallback на старую логику
         const currentDomain = window.location.origin;
         if (currentDomain.includes('localhost') || currentDomain.includes('127.0.0.1')) {
             return 'http://localhost:3001/api';

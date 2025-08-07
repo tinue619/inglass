@@ -27,6 +27,35 @@ const DataManager = {
         }
     },
     
+    async addProcess(processData) {
+        return await this.createProcess(processData);
+    },
+    
+    // === ОБНОВЛЕНИЕ ИЗ APIService ===
+    
+    updateFromServer(serverData) {
+        try {
+            console.log('🔄 Обновляем данные из APIService...');
+            
+            this.users = serverData.users || [];
+            this.processes = serverData.processes || [];
+            this.products = serverData.products || [];
+            this.orders = serverData.orders || [];
+            
+            console.log('✅ Данные обновлены:', {
+                users: this.users.length,
+                processes: this.processes.length,
+                products: this.products.length,
+                orders: this.orders.length
+            });
+            
+            return true;
+        } catch (error) {
+            console.error('❌ Ошибка обновления данных:', error);
+            return false;
+        }
+    },
+    
     // Загрузка данных с сервера через APIService
     async loadFromServer() {
         try {

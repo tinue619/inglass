@@ -404,6 +404,73 @@ window.DataManager = {
         if (window.BoardModule && typeof BoardModule.renderBoard === 'function') {
             BoardModule.renderBoard();
         }
+    },
+    
+    // Серверные операции - совместимость
+    loadFromServer: async () => {
+        try {
+            if (App.initialized) {
+                return await App.loadData();
+            }
+            return false;
+        } catch (error) {
+            console.error('Ошибка загрузки с сервера:', error);
+            return false;
+        }
+    },
+    
+    saveToServer: async () => {
+        try {
+            if (App.initialized) {
+                return await App.saveData();
+            }
+            return false;
+        } catch (error) {
+            console.error('Ошибка сохранения на сервер:', error);
+            return false;
+        }
+    },
+    
+    // Метод для безопасного обновления данных с сервера
+    updateFromServer: (serverData) => {
+        try {
+            if (!App.initialized) {
+                console.warn('App не инициализирован, пропускаем обновление');
+                return false;
+            }
+            
+            if (serverData.users) {
+                App.users.loadFromArray(serverData.users);
+            }
+            if (serverData.processes) {
+                App.processes.loadFromArray(serverData.processes);
+            }
+            if (serverData.products) {
+                App.products.loadFromArray(serverData.products);
+            }
+            if (serverData.orders) {
+                App.orders.loadFromArray(serverData.orders);
+            }
+            
+            console.log('✅ Данные обновлены с сервера через DataManager compatibility layer');
+            return true;
+        } catch (error) {
+            console.error('Ошибка обновления данных:', error);
+            return false;
+        }
+    },
+    
+    // Дополнительные методы для совместимости
+    saveToCache: () => {
+        // В новом ядре кэширование происходит автоматически
+        console.log('ℹ️ Кэширование происходит автоматически в новом ядре');
+        return true;
+    },
+    
+    loadFromCache: () => {
+        // В новом ядре восстановление происходит при инициализации
+        console.log('ℹ️ Восстановление данных происходит автоматически при инициализации');
+        return true;
     }
 };
 

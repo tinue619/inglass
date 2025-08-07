@@ -155,8 +155,14 @@ app.post('/api/users', (req, res) => {
 app.get('/api/processes', (req, res) => {
     try {
         const data = readData();
-        res.json({ success: true, data: data.processes || [] });
+        const processes = data.processes || [];
+        
+        console.log('📋 Получение процессов:', processes.length, 'шт.');
+        console.log('Процессы:', processes);
+        
+        res.json({ success: true, data: processes });
     } catch (error) {
+        console.error('Ошибка получения процессов:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -164,12 +170,28 @@ app.get('/api/processes', (req, res) => {
 app.post('/api/processes', (req, res) => {
     try {
         const data = readData();
-        const newProcess = { ...req.body, id: Date.now() };
+        const processData = req.body;
+        
+        // Убеждаемся что есть обязательные поля
+        const newProcess = {
+            id: Date.now(),
+            name: processData.name || 'Новый процесс',
+            order: processData.order || 1
+        };
+        
         data.processes = data.processes || [];
         data.processes.push(newProcess);
-        writeData(data);
-        res.json({ success: true, id: newProcess.id });
+        
+        const success = writeData(data);
+        
+        if (success) {
+            console.log('✅ Процесс создан:', newProcess);
+            res.json({ success: true, id: newProcess.id, data: newProcess });
+        } else {
+            res.status(500).json({ success: false, error: 'Ошибка сохранения' });
+        }
     } catch (error) {
+        console.error('Ошибка создания процесса:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

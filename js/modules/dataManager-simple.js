@@ -143,7 +143,20 @@ const DataManager = {
             
             if (response.ok) {
                 const result = await response.json();
+                console.log('💬 Полный ответ сервера:', result);
+                
                 if (result.success && result.data) {
+                    console.log('🗓️ Структура данных с сервера:', {
+                        users: result.data.users?.length || 0,
+                        processes: result.data.processes?.length || 0,
+                        products: result.data.products?.length || 0,
+                        orders: result.data.orders?.length || 0
+                    });
+                    
+                    if (result.data.processes && result.data.processes.length > 0) {
+                        console.log('🔍 Первый процесс:', result.data.processes[0]);
+                    }
+                    
                     this.users = result.data.users || [];
                     this.processes = result.data.processes || [];
                     this.products = result.data.products || [];
@@ -232,6 +245,8 @@ const DataManager = {
     
     async createProcess(processData) {
         try {
+            console.log('🔧 Создаем процесс:', processData);
+            
             const response = await fetch(window.APIService.baseUrl + '/processes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -240,15 +255,25 @@ const DataManager = {
             
             if (response.ok) {
                 const result = await response.json();
+                console.log('💬 Ответ сервера:', result);
+                
                 if (result.success) {
+                    // Используем данные с сервера или создаем локально
+                    const newProcess = result.data || {
+                        id: result.id || Date.now(),
+                        name: processData.name,
+                        order: processData.order
+                    };
+                    
+                    console.log('🔄 Добавляем в локальный кэш:', newProcess);
+                    
                     // Обновляем локальные данные
-                    const newProcess = { ...processData, id: result.id || Date.now() };
                     this.processes.push(newProcess);
                     
                     // Обновляем UI
                     this.notifyUIUpdate();
                     
-                    console.log('✅ Процесс создан');
+                    console.log('✅ Процесс создан успешно');
                     return result;
                 }
             }

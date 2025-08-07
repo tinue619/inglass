@@ -39,6 +39,69 @@ app.get('/api/users', (req, res) => {
     }
 });
 
+// Перемещение заказа между процессами
+app.post('/api/orders/:id/move', (req, res) => {
+    try {
+        const orderId = parseInt(req.params.id);
+        const { processId, reason, isDefect, userName } = req.body;
+        
+        console.log(`🔄 Перемещение заказа ${orderId} в процесс ${processId}`);
+        
+        const data = readData();
+        const orderIndex = data.orders.findIndex(o => o.id === orderId);
+        
+        if (orderIndex === -1) {
+            return res.status(404).json({ success: false, error: 'Заказ не найден' });
+        }
+        
+        const order = data.orders[orderIndex];
+        const oldProcessId = order.currentProcessId;
+        
+        // Обновляем заказ
+        data.orders[orderIndex].currentProcessId = processId === 0 ? null : processId;
+        data.orders[orderIndex].status = processId === 0 ? 'status-done' : 'status-process';
+        
+        // Добавляем в историю
+        if (!data.orders[orderIndex].history) {
+            data.orders[orderIndex].history = [];
+        }
+        
+        const historyEntry = {
+            id: Date.now(),
+            timestamp: new Date().toISOString(),
+            type: isDefect ? 'defect_sent' : 'moved',
+            user: { name: userName || 'Система' },
+            data: {
+                fromProcess: oldProcessId ? { id: oldProcessId, name: `Процесс ${oldProcessId}` } : null,
+                toProcess: processId === 0 ? { id: 0, name: 'Завершено' } : { id: processId, name: `Процесс ${processId}` },
+                reason: reason,
+                isDefect: isDefect || false
+            }
+        };
+        
+        data.orders[orderIndex].history.push(historyEntry);
+        
+        // Сохраняем данные
+        const success = writeData(data);
+        
+        if (success) {
+            console.log(`✅ Заказ ${orderId} перемещен успешно`);
+            res.json({ 
+                success: true, 
+                message: 'Заказ перемещен',
+                orderId: orderId,
+                newProcessId: processId
+            });
+        } else {
+            res.status(500).json({ success: false, error: 'Ошибка сохранения' });
+        }
+        
+    } catch (error) {
+        console.error('Ошибка перемещения заказа:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 app.post('/api/users', (req, res) => {
     try {
         const data = readData();

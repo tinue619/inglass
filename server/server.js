@@ -23,6 +23,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Статические файлы (ДОБАВЛЕНО)
 app.use(express.static(path.join(__dirname, '..')));
 console.log('📁 Статические файлы раздаются из:', path.join(__dirname, '..'));
+console.log('📁 Проверяем наличие index.html:', fs.existsSync(path.join(__dirname, '..', 'index.html')));
+console.log('📁 Содержимое корневой папки:', fs.readdirSync(path.join(__dirname, '..')).slice(0, 10));
 
 // Обработчик preflight запросов CORS
 app.options('*', (req, res) => {

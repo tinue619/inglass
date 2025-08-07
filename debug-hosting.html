@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM System - Диагностика</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f0f0f0; 
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+        }
+        .status { 
+            padding: 10px; 
+            margin: 5px 0; 
+            border-radius: 4px; 
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .btn { 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            padding: 10px 15px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            margin: 5px; 
+        }
+        pre { 
+            background: #f8f9fa; 
+            padding: 10px; 
+            border-radius: 4px; 
+            overflow-x: auto; 
+            font-size: 12px; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 CRM System - Диагностика Хостинга</h1>
+        <p>Эта страница поможет найти проблему с загрузкой на хостинге.</p>
+        
+        <div id="diagnostics"></div>
+        
+        <button class="btn" onclick="runDiagnostics()">🔍 Запустить диагностику</button>
+        <button class="btn" onclick="testAPI()">🌐 Тест API</button>
+        <button class="btn" onclick="testModules()">📦 Тест модулей</button>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const div = document.getElementById('diagnostics');
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            div.innerHTML += `<div class="status ${className}">${message}</div>`;
+            console.log(message);
+        }
+
+        function runDiagnostics() {
+            document.getElementById('diagnostics').innerHTML = '';
+            
+            log('🚀 Запуск диагностики...', 'info');
+            
+            // Основная информация
+            log(`📍 Текущий URL: ${window.location.href}`, 'info');
+            log(`🌐 Домен: ${window.location.origin}`, 'info');
+            log(`📱 User Agent: ${navigator.userAgent.substring(0, 50)}...`, 'info');
+            
+            // Проверка файлов
+            const testFiles = [
+                'css/styles.css',
+                'js/utils/config.js',
+                'js/core/app.js',
+                'js/modules/authModule.js'
+            ];
+            
+            log('📁 Проверка статических файлов:', 'info');
+            
+            testFiles.forEach(file => {
+                fetch(file)
+                    .then(response => {
+                        if (response.ok) {
+                            log(`✅ ${file} - загружается`, 'success');
+                        } else {
+                            log(`❌ ${file} - ошибка ${response.status}`, 'error');
+                        }
+                    })
+                    .catch(error => {
+                        log(`❌ ${file} - не загружается: ${error.message}`, 'error');
+                    });
+            });
+        }
+
+        function testAPI() {
+            log('🌐 Тестирование API...', 'info');
+            
+            // Определяем API URL
+            const apiUrl = window.location.origin + '/api';
+            log(`🔗 API URL: ${apiUrl}`, 'info');
+            
+            // Тест health check
+            fetch(`${apiUrl}/health`)
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    throw new Error(`HTTP ${response.status}`);
+                })
+                .then(data => {
+                    log(`✅ API Health: ${JSON.stringify(data)}`, 'success');
+                })
+                .catch(error => {
+                    log(`❌ API Health ошибка: ${error.message}`, 'error');
+                });
+            
+            // Тест данных
+            fetch(`${apiUrl}/data`)
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    throw new Error(`HTTP ${response.status}`);
+                })
+                .then(data => {
+                    log(`✅ API Data: пользователей ${data.data?.users?.length || 0}`, 'success');
+                })
+                .catch(error => {
+                    log(`❌ API Data ошибка: ${error.message}`, 'error');
+                });
+        }
+
+        function testModules() {
+            log('📦 Тестирование загрузки модулей...', 'info');
+            
+            // Создаем тестовые скрипты
+            const modules = [
+                'js/utils/constants.js',
+                'js/utils/config.js',
+                'js/core/entities.js',
+                'js/core/managers.js',
+                'js/core/app.js'
+            ];
+            
+            let loadedCount = 0;
+            let totalCount = modules.length;
+            
+            modules.forEach((module, index) => {
+                const script = document.createElement('script');
+                script.src = module;
+                
+                script.onload = () => {
+                    loadedCount++;
+                    log(`✅ ${module} - загружен`, 'success');
+                    
+                    if (loadedCount === totalCount) {
+                        log('🎉 Все модули загружены! Проверяем глобальные объекты...', 'success');
+                        
+                        setTimeout(() => {
+                            const globals = ['APP_CONSTANTS', 'APP_CONFIG', 'User', 'Order', 'App', 'DataManager'];
+                            globals.forEach(global => {
+                                if (typeof window[global] !== 'undefined') {
+                                    log(`✅ ${global} доступен`, 'success');
+                                } else {
+                                    log(`❌ ${global} не найден`, 'error');
+                                }
+                            });
+                        }, 1000);
+                    }
+                };
+                
+                script.onerror = () => {
+                    log(`❌ ${module} - ошибка загрузки`, 'error');
+                };
+                
+                document.head.appendChild(script);
+            });
+        }
+
+        // Автозапуск диагностики
+        window.onload = () => {
+            setTimeout(runDiagnostics, 500);
+        };
+    </script>
+</body>
+</html>

@@ -31,19 +31,22 @@ const DataManager = {
         try {
             console.log('📥 Загружаем данные с сервера...');
             
-            // Загружаем все данные параллельно
-            const [users, processes, products, orders] = await Promise.all([
-                this.api.getEntity('users'),
-                this.api.getEntity('processes'),
-                this.api.getEntity('products'),
-                this.api.getEntity('orders')
-            ]);
+            // Используем метод loadFromServer из APIService
+            const response = await this.api.loadFromServer();
             
-            // Обновляем кэш
-            this.cache.users = users || [];
-            this.cache.processes = processes || [];
-            this.cache.products = products || [];
-            this.cache.orders = orders || [];
+            if (response && response.data) {
+                // Обновляем кэш
+                this.cache.users = response.data.users || [];
+                this.cache.processes = response.data.processes || [];
+                this.cache.products = response.data.products || [];
+                this.cache.orders = response.data.orders || [];
+            } else {
+                // Инициализируем пустыми массивами если нет данных
+                this.cache.users = [];
+                this.cache.processes = [];
+                this.cache.products = [];
+                this.cache.orders = [];
+            }
             
             console.log('✅ Данные загружены:', {
                 users: this.cache.users.length,
@@ -57,6 +60,11 @@ const DataManager = {
             
         } catch (error) {
             console.error('❌ Ошибка загрузки данных:', error);
+            // Инициализируем пустыми данными в случае ошибки
+            this.cache.users = [];
+            this.cache.processes = [];
+            this.cache.products = [];
+            this.cache.orders = [];
             throw error;
         }
     },
@@ -72,10 +80,13 @@ const DataManager = {
     
     async createUser(userData) {
         try {
-            const newUser = await this.api.createEntity('users', userData);
-            this.cache.users.push(newUser);
-            this.notifyDataChanged();
-            return newUser;
+            const result = await this.api.createEntity('users', userData);
+            if (result && result.success) {
+                // Перезагружаем данные с сервера
+                await this.loadFromServer();
+                return result;
+            }
+            throw new Error(result.error || 'Ошибка создания пользователя');
         } catch (error) {
             console.error('Ошибка создания пользователя:', error);
             throw error;

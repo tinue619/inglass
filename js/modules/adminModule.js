@@ -44,6 +44,11 @@ const AdminModule = {
         `;
         setTimeout(() => this.renderAllTables(), 100);
     },
+    
+    // Метод для совместимости с DataManager
+    renderProcesses() {
+        this.renderProcessesTable();
+    },
 
     switchTab(tabName) {
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -237,7 +242,7 @@ const AdminModule = {
         const container = document.getElementById('processes-table');
         if (!container) return;
         
-        const processes = DataManager.getProcesses().sort((a, b) => a.order - b.order);
+        const processes = DataManager.getProcesses().sort((a, b) => (a.order || 0) - (b.order || 0));
         if (processes.length === 0) {
             container.innerHTML = '<p>Нет процессов</p>';
             return;
@@ -251,8 +256,8 @@ const AdminModule = {
                 <tbody>
                     ${processes.map(process => `
                         <tr>
-                            <td>${process.order}</td>
-                            <td>${process.name}</td>
+                            <td>${process.order || 'Не указан'}</td>
+                            <td>${process.name || 'Без названия'}</td>
                             <td>
                                 <button class="btn btn-small btn-secondary" onclick="AdminModule.editProcess(${process.id})">Изменить</button>
                                 <button class="btn btn-small btn-danger" onclick="AdminModule.deleteProcess(${process.id})">Удалить</button>

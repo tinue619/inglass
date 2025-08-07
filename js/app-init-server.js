@@ -35,6 +35,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 
                 // Запускаем автообновление
                 DataManager.startAutoRefresh(30000);
+                console.log('🔄 Автообновление запущено');
                 
                 // Показываем главное приложение
                 AppModule.showMainApp();

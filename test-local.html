@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM System - Локальная версия</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .btn {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover { background: #0056b3; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏗️ CRM System - Архитектурное ядро</h1>
+        <p>Локальная версия для тестирования и разработки</p>
+        
+        <div id="loading-status">
+            <div class="status info">📥 Загрузка модулей...</div>
+        </div>
+        
+        <div id="app-container" style="display: none;">
+            <h2>✅ Система загружена</h2>
+            <div id="app"></div>
+        </div>
+        
+        <div id="debug-info" style="margin-top: 20px;">
+            <h3>🔍 Отладочная информация</h3>
+            <button class="btn" onclick="showDebugInfo()">Показать статистику</button>
+            <button class="btn" onclick="testNewCore()">Тест ядра</button>
+            <button class="btn" onclick="location.reload()">🔄 Перезагрузить</button>
+            <div id="debug-output"></div>
+        </div>
+    </div>
+    
+    <script>
+        window.loadingErrors = [];
+        
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('loading-status');
+            const statusClass = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            statusDiv.innerHTML += `<div class="status ${statusClass}">${message}</div>`;
+            console.log(message);
+        }
+        
+        function showDebugInfo() {
+            const output = document.getElementById('debug-output');
+            const info = {
+                'Браузер': navigator.userAgent,
+                'URL': window.location.href,
+                'Ошибки загрузки': loadingErrors,
+                'Глобальные объекты': {
+                    'App': typeof window.App !== 'undefined',
+                    'DataManager': typeof window.DataManager !== 'undefined',
+                    'AuthModule': typeof window.AuthModule !== 'undefined',
+                    'AppModule': typeof window.AppModule !== 'undefined',
+                    'APIService': typeof window.APIService !== 'undefined'
+                }
+            };
+            
+            if (window.App && window.App.getStats) {
+                info['Статистика App'] = window.App.getStats();
+            }
+            
+            output.innerHTML = '<pre>' + JSON.stringify(info, null, 2) + '</pre>';
+        }
+        
+        function testNewCore() {
+            const output = document.getElementById('debug-output');
+            let testResults = [];
+            
+            try {
+                // Тест создания пользователя
+                if (window.App && window.App.users) {
+                    const testUser = window.App.users.create({
+                        name: 'Тестовый пользователь',
+                        phone: '+7 999 123 4567',
+                        isAdmin: true
+                    });
+                    testResults.push('✅ Создание пользователя: OK');
+                    
+                    // Тест создания процесса
+                    const testProcess = window.App.processes.create({
+                        name: 'Тестовый процесс',
+                        order: 1
+                    });
+                    testResults.push('✅ Создание процесса: OK');
+                    
+                    // Тест создания заказа
+                    const testOrder = window.App.orders.create({
+                        productId: 1,
+                        client: 'Тестовый клиент',
+                        quantity: 1
+                    });
+                    testResults.push('✅ Создание заказа: OK');
+                    
+                    // Тест перемещения заказа
+                    testOrder.moveToProcess(testProcess.id, {
+                        userName: 'Тестер',
+                        reason: 'Тестовое перемещение'
+                    });
+                    testResults.push('✅ Перемещение заказа: OK');
+                    
+                } else {
+                    testResults.push('❌ App.users не найден');
+                }
+                
+            } catch (error) {
+                testResults.push('❌ Ошибка теста: ' + error.message);
+            }
+            
+            output.innerHTML = '<div class="status info"><strong>Результаты тестирования:</strong><br>' + 
+                              testResults.join('<br>') + '</div>';
+        }
+        
+        updateStatus('🚀 Начинаем загрузку...');
+    </script>
+    
+    <!-- Загружаем модули по порядку -->
+    <script src="js/utils/constants.js" onload="updateStatus('✅ Constants загружен')" onerror="updateStatus('❌ Ошибка: constants.js', 'error'); loadingErrors.push('constants.js')"></script>
+    <script src="js/utils/config.js" onload="updateStatus('✅ Config загружен')" onerror="updateStatus('❌ Ошибка: config.js', 'error'); loadingErrors.push('config.js')"></script>
+    <script src="js/utils/phoneUtils.js" onload="updateStatus('✅ PhoneUtils загружен')" onerror="updateStatus('❌ Ошибка: phoneUtils.js', 'error'); loadingErrors.push('phoneUtils.js')"></script>
+    <script src="js/utils/contactEntities.js" onload="updateStatus('✅ ContactEntities загружен')" onerror="updateStatus('❌ Ошибка: contactEntities.js', 'error'); loadingErrors.push('contactEntities.js')"></script>
+    <script src="js/utils/orderUtils.js" onload="updateStatus('✅ OrderUtils загружен')" onerror="updateStatus('❌ Ошибка: orderUtils.js', 'error'); loadingErrors.push('orderUtils.js')"></script>
+    
+    <script src="js/services/APIService.js" onload="updateStatus('✅ APIService загружен')" onerror="updateStatus('❌ Ошибка: APIService.js', 'error'); loadingErrors.push('APIService.js')"></script>
+    
+    <script src="js/core/entities.js" onload="updateStatus('✅ Entities загружен')" onerror="updateStatus('❌ Ошибка: entities.js', 'error'); loadingErrors.push('entities.js')"></script>
+    <script src="js/core/managers.js" onload="updateStatus('✅ Managers загружен')" onerror="updateStatus('❌ Ошибка: managers.js', 'error'); loadingErrors.push('managers.js')"></script>
+    <script src="js/core/app.js" onload="updateStatus('✅ App Core загружен')" onerror="updateStatus('❌ Ошибка: app.js', 'error'); loadingErrors.push('app.js')"></script>
+    
+    <script src="js/modules/modalModule.js" onload="updateStatus('✅ ModalModule загружен')" onerror="updateStatus('❌ Ошибка: modalModule.js', 'error'); loadingErrors.push('modalModule.js')"></script>
+    <script src="js/modules/authModule.js" onload="updateStatus('✅ AuthModule загружен')" onerror="updateStatus('❌ Ошибка: authModule.js', 'error'); loadingErrors.push('authModule.js')"></script>
+    <script src="js/modules/boardModule.js" onload="updateStatus('✅ BoardModule загружен')" onerror="updateStatus('❌ Ошибка: boardModule.js', 'error'); loadingErrors.push('boardModule.js')"></script>
+    <script src="js/modules/defectModule.js" onload="updateStatus('✅ DefectModule загружен')" onerror="updateStatus('❌ Ошибка: defectModule.js', 'error'); loadingErrors.push('defectModule.js')"></script>
+    <script src="js/modules/adminModule.js" onload="updateStatus('✅ AdminModule загружен')" onerror="updateStatus('❌ Ошибка: adminModule.js', 'error'); loadingErrors.push('adminModule.js')"></script>
+    <script src="js/modules/appModule.js" onload="updateStatus('✅ AppModule загружен')" onerror="updateStatus('❌ Ошибка: appModule.js', 'error'); loadingErrors.push('appModule.js')"></script>
+    
+    <!-- Финальная проверка -->
+    <script>
+        setTimeout(() => {
+            updateStatus('📊 Диагностика завершена', 'success');
+            
+            if (loadingErrors.length > 0) {
+                updateStatus('❌ Найдены ошибки в файлах: ' + loadingErrors.join(', '), 'error');
+            } else {
+                updateStatus('✅ Все модули загружены успешно', 'success');
+                
+                // Проверяем глобальные объекты
+                const components = ['App', 'DataManager', 'AuthModule', 'AppModule', 'APIService'];
+                const available = components.filter(comp => typeof window[comp] !== 'undefined');
+                const missing = components.filter(comp => typeof window[comp] === 'undefined');
+                
+                if (available.length > 0) {
+                    updateStatus('✅ Доступные компоненты: ' + available.join(', '), 'success');
+                }
+                
+                if (missing.length > 0) {
+                    updateStatus('❌ Отсутствующие компоненты: ' + missing.join(', '), 'error');
+                } else {
+                    updateStatus('🎉 Все компоненты загружены успешно!', 'success');
+                    document.getElementById('app-container').style.display = 'block';
+                    
+                    // Пытаемся инициализировать приложение
+                    if (window.App && typeof window.App.init === 'function') {
+                        updateStatus('🚀 Инициализация App...', 'info');
+                        window.App.init().then(() => {
+                            updateStatus('✅ App инициализирован успешно', 'success');
+                            if (window.AuthModule && window.AuthModule.showLoginScreen) {
+                                document.getElementById('app').innerHTML = '<div class="status success">✅ Система готова! Переходите к index.html для полной версии.</div>';
+                            }
+                        }).catch(error => {
+                            updateStatus('❌ Ошибка инициализации App: ' + error.message, 'error');
+                        });
+                    }
+                }
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

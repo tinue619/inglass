@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Настройка API URL для GitHub Pages + Heroku -->
-    <meta name="api-url" content="https://inglass-9be99f83280c.herokuapp.com/api">
+    <!-- Настройка API URL для локальной разработки -->
+    <meta name="api-url" content="http://localhost:3001/api">
     <title>CRM System</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,7 +13,12 @@
     <link rel="stylesheet" href="css/drag-drop.css">
 </head>
 <body>
-    <div id="app"></div>
+    <div id="app">
+        <div style="padding: 40px; text-align: center;">
+            <h2>🔄 Загрузка CRM системы...</h2>
+            <p>Инициализация архитектурного ядра</p>
+        </div>
+    </div>
     
     <!-- Подключаем модули в правильном порядке -->
     <script>
@@ -34,12 +39,13 @@
     <script src="js/core/entities.js"></script>
     <script src="js/core/managers.js"></script>
     <script src="js/core/app.js"></script>
+    
+    <!-- Модули UI -->
     <script src="js/modules/modalModule.js"></script>
     <script src="js/modules/authModule.js"></script>
     <script src="js/modules/boardModule.js"></script>
     <script src="js/modules/defectModule.js"></script>
     <script src="js/modules/adminModule.js"></script>
-    
     <script src="js/modules/appModule.js"></script>
     
     <!-- Инициализация приложения -->

@@ -20,6 +20,10 @@ app.use(cors({
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Статические файлы (ДОБАВЛЕНО)
+app.use(express.static(path.join(__dirname, '..')));
+console.log('📁 Статические файлы раздаются из:', path.join(__dirname, '..'));
+
 // Обработчик preflight запросов CORS
 app.options('*', (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -290,12 +294,30 @@ app.use((err, req, res, next) => {
     });
 });
 
-// 404 для несуществующих маршрутов
-app.use((req, res) => {
+// Главная страница (ДОБАВЛЕНО)
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'index.html'));
+});
+
+// 404 для API маршрутов
+app.use('/api/*', (req, res) => {
     res.status(404).json({
         success: false,
-        error: 'Маршрут не найден'
+        error: 'API маршрут не найден'
     });
+});
+
+// 404 для остальных маршрутов (отдаем главную страницу для SPA)
+app.use((req, res) => {
+    // Если это запрос на HTML страницу, отдаем index.html
+    if (req.accepts('html')) {
+        res.sendFile(path.join(__dirname, '..', 'index.html'));
+    } else {
+        res.status(404).json({
+            success: false,
+            error: 'Маршрут не найден'
+        });
+    }
 });
 
 // Запуск сервера

@@ -169,30 +169,58 @@ app.get('/api/processes', (req, res) => {
 
 app.post('/api/processes', (req, res) => {
     try {
+        console.log('🔄 Получен запрос на создание процесса:', req.body);
+        
         const data = readData();
+        console.log('📊 Текущие данные:', {
+            users: data.users?.length || 0,
+            processes: data.processes?.length || 0,
+            products: data.products?.length || 0,
+            orders: data.orders?.length || 0
+        });
+        
         const processData = req.body;
         
-        // Убеждаемся что есть обязательные поля
+        // Проверяем обязательные поля
+        if (!processData.name || processData.name.trim() === '') {
+            console.log('❌ Ошибка: название процесса пустое');
+            return res.status(400).json({ success: false, error: 'Название процесса обязательно' });
+        }
+        
+        // Создаем новый процесс
         const newProcess = {
             id: Date.now(),
-            name: processData.name || 'Новый процесс',
-            order: processData.order || 1
+            name: processData.name.trim(),
+            order: parseInt(processData.order) || 1
         };
         
-        data.processes = data.processes || [];
+        console.log('🆕 Новый процесс:', newProcess);
+        
+        // Инициализируем массив процессов если нужно
+        if (!data.processes) {
+            data.processes = [];
+            console.log('🔄 Инициализировали массив процессов');
+        }
+        
         data.processes.push(newProcess);
         
+        console.log('💾 Попытка сохранения данных...');
         const success = writeData(data);
         
         if (success) {
-            console.log('✅ Процесс создан:', newProcess);
+            console.log('✅ Процесс создан успешно:', newProcess);
             res.json({ success: true, id: newProcess.id, data: newProcess });
         } else {
-            res.status(500).json({ success: false, error: 'Ошибка сохранения' });
+            console.log('❌ Ошибка сохранения данных');
+            res.status(500).json({ success: false, error: 'Ошибка сохранения данных' });
         }
     } catch (error) {
-        console.error('Ошибка создания процесса:', error);
-        res.status(500).json({ success: false, error: error.message });
+        console.error('❌ Критическая ошибка создания процесса:', error);
+        console.error('Stack trace:', error.stack);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Критическая ошибка: ' + error.message
+        });
     }
 });
 
@@ -314,12 +342,27 @@ function readData() {
 
 function writeData(data) {
     try {
+        console.log('💾 Начинаем запись данных...');
+        console.log('📊 Статистика данных:', {
+            users: data.users?.length || 0,
+            processes: data.processes?.length || 0,
+            products: data.products?.length || 0,
+            orders: data.orders?.length || 0
+        });
+        
         data.lastSync = new Date().toISOString();
-        fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
-        console.log('💾 Данные сохранены в', new Date().toLocaleString());
+        const jsonData = JSON.stringify(data, null, 2);
+        
+        console.log('📝 Размер данных:', Math.round(jsonData.length / 1024), 'Кб');
+        
+        fs.writeFileSync(DATA_FILE, jsonData, 'utf8');
+        
+        console.log('✅ Данные сохранены в', new Date().toLocaleString());
         return true;
     } catch (error) {
-        console.error('Ошибка записи данных:', error);
+        console.error('❌ Ошибка записи данных:', error);
+        console.error('File path:', DATA_FILE);
+        console.error('Error details:', error.stack);
         return false;
     }
 }

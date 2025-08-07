@@ -27,8 +27,83 @@ const DataManager = {
         }
     },
     
+    // === ОБНОВЛЕНИЕ UI ===
+    
+    notifyUIUpdate() {
+        // Обновляем админку если открыта
+        if (window.AdminModule && typeof AdminModule.renderProcesses === 'function') {
+            AdminModule.renderProcesses();
+        }
+        
+        // Обновляем доску процессов
+        if (window.BoardModule && typeof BoardModule.renderBoard === 'function') {
+            BoardModule.renderBoard();
+        }
+        
+        console.log('🔄 UI обновлен');
+    },
+    
     async addProcess(processData) {
         return await this.createProcess(processData);
+    },
+    
+    async removeProcess(processId) {
+        try {
+            console.log('🗑️ Удаляем процесс:', processId);
+            
+            const response = await fetch(`${window.APIService.baseUrl}/processes/${processId}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    // Обновляем локальный кэш
+                    this.processes = this.processes.filter(p => p.id !== parseInt(processId));
+                    
+                    // Обновляем UI
+                    this.notifyUIUpdate();
+                    
+                    console.log('✅ Процесс удален');
+                    return result;
+                }
+            }
+            
+            throw new Error('Ошибка удаления процесса');
+        } catch (error) {
+            console.error('❌ Ошибка удаления процесса:', error);
+            throw error;
+        }
+    },
+    
+    async updateProcess(processId, processData) {
+        try {
+            const response = await fetch(`${window.APIService.baseUrl}/processes/${processId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(processData)
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    // Обновляем локальный кэш
+                    const index = this.processes.findIndex(p => p.id === parseInt(processId));
+                    if (index !== -1) {
+                        this.processes[index] = { ...this.processes[index], ...processData };
+                    }
+                    
+                    this.notifyUIUpdate();
+                    return result;
+                }
+            }
+            
+            throw new Error('Ошибка обновления процесса');
+        } catch (error) {
+            console.error('❌ Ошибка обновления процесса:', error);
+            throw error;
+        }
     },
     
     // === ОБНОВЛЕНИЕ ИЗ APIService ===
@@ -166,7 +241,14 @@ const DataManager = {
             if (response.ok) {
                 const result = await response.json();
                 if (result.success) {
-                    await this.loadFromServer();
+                    // Обновляем локальные данные
+                    const newProcess = { ...processData, id: result.id || Date.now() };
+                    this.processes.push(newProcess);
+                    
+                    // Обновляем UI
+                    this.notifyUIUpdate();
+                    
+                    console.log('✅ Процесс создан');
                     return result;
                 }
             }

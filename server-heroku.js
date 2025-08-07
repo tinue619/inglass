@@ -39,6 +39,42 @@ app.get('/api/users', (req, res) => {
     }
 });
 
+app.delete('/api/processes/:id', (req, res) => {
+    try {
+        const processId = parseInt(req.params.id);
+        const data = readData();
+        const processIndex = data.processes.findIndex(p => p.id === processId);
+        
+        if (processIndex === -1) {
+            return res.status(404).json({ success: false, error: 'Процесс не найден' });
+        }
+        
+        data.processes.splice(processIndex, 1);
+        writeData(data);
+        res.json({ success: true, message: 'Процесс удален' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.put('/api/processes/:id', (req, res) => {
+    try {
+        const processId = parseInt(req.params.id);
+        const data = readData();
+        const processIndex = data.processes.findIndex(p => p.id === processId);
+        
+        if (processIndex === -1) {
+            return res.status(404).json({ success: false, error: 'Процесс не найден' });
+        }
+        
+        data.processes[processIndex] = { ...data.processes[processIndex], ...req.body };
+        writeData(data);
+        res.json({ success: true, message: 'Процесс обновлен' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Перемещение заказа между процессами
 app.post('/api/orders/:id/move', (req, res) => {
     try {

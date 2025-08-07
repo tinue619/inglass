@@ -31,7 +31,7 @@
     <script src="js/services/APIService.js"></script>
     
     <!-- Модули данных и логики -->
-    <script src="js/modules/dataManager.js"></script>
+    <script src="js/modules/dataManager-server.js"></script>
     <script src="js/modules/modalModule.js"></script>
     <script src="js/modules/authModule.js"></script>
     <script src="js/modules/boardModule.js"></script>
@@ -41,14 +41,6 @@
     <script src="js/modules/appModule.js"></script>
     
     <!-- Инициализация приложения -->
-    <script>
-        console.log('✅ Все модули загружены!');
-        
-        // Инициализация приложения
-        document.addEventListener('DOMContentLoaded', async () => {
-            await AppModule.init();
-            AppModule.initWindowEvents();
-        });
-    </script>
+    <script src="js/app-init-server.js"></script>
 </body>
 </html>

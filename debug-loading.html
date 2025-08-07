@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Настройка API URL для GitHub Pages + Heroku -->
+    <meta name="api-url" content="https://inglass-9be99f83280c.herokuapp.com/api">
+    <title>CRM System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/drag-drop.css">
+</head>
+<body>
+    <div id="app">
+        <div style="padding: 40px; text-align: center;">
+            <h2>🔄 Загрузка CRM системы...</h2>
+            <p>Инициализация архитектурного ядра</p>
+            <div id="loading-status"></div>
+        </div>
+    </div>
+    
+    <!-- Диагностика загрузки -->
+    <script>
+        console.log('🔧 Начало загрузки модулей...');
+        window.loadingErrors = [];
+        
+        function updateStatus(message) {
+            const status = document.getElementById('loading-status');
+            if (status) {
+                status.innerHTML += '<div>' + message + '</div>';
+            }
+            console.log(message);
+        }
+        
+        updateStatus('✅ HTML загружен');
+    </script>
+    
+    <!-- Константы и утилиты -->
+    <script src="js/utils/constants.js" onload="updateStatus('✅ Constants загружен')" onerror="updateStatus('❌ Ошибка: constants.js'); loadingErrors.push('constants.js')"></script>
+    <script src="js/utils/config.js" onload="updateStatus('✅ Config загружен')" onerror="updateStatus('❌ Ошибка: config.js'); loadingErrors.push('config.js')"></script>
+    <script src="js/utils/phoneUtils.js" onload="updateStatus('✅ PhoneUtils загружен')" onerror="updateStatus('❌ Ошибка: phoneUtils.js'); loadingErrors.push('phoneUtils.js')"></script>
+    <script src="js/utils/contactEntities.js" onload="updateStatus('✅ ContactEntities загружен')" onerror="updateStatus('❌ Ошибка: contactEntities.js'); loadingErrors.push('contactEntities.js')"></script>
+    <script src="js/utils/orderUtils.js" onload="updateStatus('✅ OrderUtils загружен')" onerror="updateStatus('❌ Ошибка: orderUtils.js'); loadingErrors.push('orderUtils.js')"></script>
+    
+    <!-- Сервисы -->
+    <script src="js/services/APIService.js" onload="updateStatus('✅ APIService загружен')" onerror="updateStatus('❌ Ошибка: APIService.js'); loadingErrors.push('APIService.js')"></script>
+    
+    <!-- Архитектурное ядро -->
+    <script src="js/core/entities.js" onload="updateStatus('✅ Entities загружен')" onerror="updateStatus('❌ Ошибка: entities.js'); loadingErrors.push('entities.js')"></script>
+    <script src="js/core/managers.js" onload="updateStatus('✅ Managers загружен')" onerror="updateStatus('❌ Ошибка: managers.js'); loadingErrors.push('managers.js')"></script>
+    <script src="js/core/app.js" onload="updateStatus('✅ App Core загружен')" onerror="updateStatus('❌ Ошибка: app.js'); loadingErrors.push('app.js')"></script>
+    
+    <!-- Модули UI -->
+    <script src="js/modules/modalModule.js" onload="updateStatus('✅ ModalModule загружен')" onerror="updateStatus('❌ Ошибка: modalModule.js'); loadingErrors.push('modalModule.js')"></script>
+    <script src="js/modules/authModule.js" onload="updateStatus('✅ AuthModule загружен')" onerror="updateStatus('❌ Ошибка: authModule.js'); loadingErrors.push('authModule.js')"></script>
+    <script src="js/modules/boardModule.js" onload="updateStatus('✅ BoardModule загружен')" onerror="updateStatus('❌ Ошибка: boardModule.js'); loadingErrors.push('boardModule.js')"></script>
+    <script src="js/modules/defectModule.js" onload="updateStatus('✅ DefectModule загружен')" onerror="updateStatus('❌ Ошибка: defectModule.js'); loadingErrors.push('defectModule.js')"></script>
+    <script src="js/modules/adminModule.js" onload="updateStatus('✅ AdminModule загружен')" onerror="updateStatus('❌ Ошибка: adminModule.js'); loadingErrors.push('adminModule.js')"></script>
+    <script src="js/modules/appModule.js" onload="updateStatus('✅ AppModule загружен')" onerror="updateStatus('❌ Ошибка: appModule.js'); loadingErrors.push('appModule.js')"></script>
+    
+    <!-- Инициализация приложения -->
+    <script src="js/app-init-core.js" onload="updateStatus('✅ Инициализация загружена')" onerror="updateStatus('❌ Ошибка: app-init-core.js'); loadingErrors.push('app-init-core.js')"></script>
+    
+    <!-- Финальная диагностика -->
+    <script>
+        setTimeout(() => {
+            updateStatus('📊 Диагностика завершена');
+            if (loadingErrors.length > 0) {
+                updateStatus('❌ Найдены ошибки в файлах: ' + loadingErrors.join(', '));
+            } else {
+                updateStatus('✅ Все модули загружены успешно');
+            }
+            
+            // Показываем состояние глобальных объектов
+            updateStatus('🔍 Проверка глобальных объектов:');
+            updateStatus('App: ' + (typeof window.App !== 'undefined' ? '✅' : '❌'));
+            updateStatus('DataManager: ' + (typeof window.DataManager !== 'undefined' ? '✅' : '❌'));
+            updateStatus('AuthModule: ' + (typeof window.AuthModule !== 'undefined' ? '✅' : '❌'));
+            updateStatus('AppModule: ' + (typeof window.AppModule !== 'undefined' ? '✅' : '❌'));
+        }, 2000);
+    </script>
+</body>
+</html>
